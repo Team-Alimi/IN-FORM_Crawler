@@ -14,7 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
 # config.py에서 변수들 가져오기
-from config import DATA_DIR, TARGET_KEYWORDS
+from config import DATA_DIR, KEYWORD_CATEGORIES
 
 
 class BaseCrawler:
@@ -122,12 +122,20 @@ class TypeACrawler(BaseCrawler):
                     continue
 
                     # 3. 키워드 검증
-                if not any(keyword in title_text for keyword in TARGET_KEYWORDS):
+                matching_category = None
+                # KEYWORD_CATEGORIES를 순회하며 키워드를 검증하고, 일치하면 카테고리를 저장합니다.
+                for category, keywords in KEYWORD_CATEGORIES.items():
+                    if any(keyword in title_text for keyword in keywords):
+                        matching_category = category
+                        break
+
+                # 일치하는 키워드가 없어 matching_category가 None이면 다음 게시글로 스킵
+                if not matching_category:
                     continue
 
                     # 4. 상세 수집 시작
                 try:
-                    # [수정 2] 텍스트 검색 대신, '몇 번째 줄(i+1)'에 있는 링크인지 정확한 위치(XPath)로 클릭
+                    #  텍스트 검색 대신, '몇 번째 줄(i+1)'에 있는 링크인지 정확한 위치(XPath)로 클릭
                     # XPath 설명: //tbody의 (i+1)번째 tr 안에 있는 -> ._artclTdTitle 클래스를 가진 td 안의 -> a 태그
                     # (i는 0부터 시작하므로 XPath에서는 i+1을 해야 함)
                     xpath = f'//tbody/tr[{i + 1}]/td[contains(@class, "_artclTdTitle")]/a'
@@ -141,7 +149,7 @@ class TypeACrawler(BaseCrawler):
                     time.sleep(1)
 
                     # 상세 페이지 파싱
-                    self._parse_detail_page(title_text)
+                    self._parse_detail_page(title_text, matching_category)
                     page_processed_count += 1
 
                     # 뒤로 가기
@@ -167,7 +175,7 @@ class TypeACrawler(BaseCrawler):
                 print(f"✅ [{self.site_name}] 마지막 페이지 도달.")
                 break
 
-    def _parse_detail_page(self, list_title):
+    def _parse_detail_page(self, list_title,category):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
         # 본문
@@ -188,9 +196,9 @@ class TypeACrawler(BaseCrawler):
             val = dd.get_text(strip=True)
 
             if '작성일' in label:
-                created_at = val.replace('.', '-') + " 00:00:00"
+                created_at = val.replace('.', '-')
             elif '수정일' in label:
-                updated_at = val.replace('.', '-') + " 00:00:00"
+                updated_at = val.replace('.', '-')
 
         # 리스트에 저장
         self.collected_data.append({
@@ -199,9 +207,10 @@ class TypeACrawler(BaseCrawler):
             'original_url': self.driver.current_url,
             'created_at': created_at,
             'updated_at': updated_at,
-            'vendor_id': self.vendor_id
+            'vendor_id': self.vendor_id,
+            'category': category
         })
-        print(f"   ---> 수집 성공: {list_title}")
+        print(f"   ---> 수집 성공: {list_title} (Category: {category})")
 
 
 class TypeBCrawler(BaseCrawler):

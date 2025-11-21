@@ -11,28 +11,17 @@ DB_CONFIG = {
 }
 
 # 2. 타겟 키워드
-TARGET_KEYWORDS = [
-  "세미나",
-  "설명회",
-  "멘토링",
-  "특강",
-  "강의",
-  "공모전",
-  "챌린지",
-  "challenge",
-  "프로젝트",
-  "project",
-  "대회",
-  "해커톤",
-  "hackerthon",
-  "메이커톤",
-  "makerthon",
-  "아이디어톤",
-  "ideathon",
-  "대회",
-  "콘테스트",
-  "contest"
-]
+KEYWORD_CATEGORIES = {
+    1: [ #LECTURE
+        "세미나", "설명회", "멘토링", "특강", "강의"
+    ],
+    2: [ #CONTEST
+        "공모전", "챌린지", "challenge", "프로젝트", "project"
+    ],
+    3: [ #COMPETITION
+        "대회", "해커톤", "hackerthon", "메이커톤", "makerthon", "아이디어톤", "ideathon", "콘테스트", "contest"
+    ]
+}
 
 # 3. 사이트 목록 정의
 # vendor_id: DB의 vendors 테이블에 존재하는 ID여야 합니다. (FK 제약조건)
