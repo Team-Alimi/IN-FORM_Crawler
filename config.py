@@ -203,9 +203,9 @@ SITES = [
     # === TYPE B (오전 12시 실행 그룹) ===
     {
         'type': 'B',
-        'name': 'Battery_Center',
-        'url': 'http://ibattery.website.ne.kr/sub/sub04_01.php',
-        'vendor_id': 99
+        'name': 'Inha_FutureVehicleTech',
+        'url': 'https://fvt.inha.ac.kr/fvt/board/5',
+        'vendor_id': 21
     },
 ]
 
