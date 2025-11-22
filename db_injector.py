@@ -33,7 +33,7 @@ def inject_json_to_db(target_sites):
                 # 3. Bulk Insert 쿼리 준비
                 sql = """
                       INSERT INTO school_articles
-                          (title, content, original_url, created_at, updated_at, vendor_id)
+                          (title, content, original_url, created_at, updated_at, vendor_id, category)
                       VALUES (%s, %s, %s, %s, %s, %s) \
                       """
 
@@ -41,7 +41,7 @@ def inject_json_to_db(target_sites):
                 values = [
                     (
                         a['title'], a['content'], a['original_url'],
-                        a['created_at'], a['updated_at'], a['vendor_id']
+                        a['created_at'], a['updated_at'], a['vendor_id'],a['category']
                     )
                     for a in articles
                 ]
