@@ -1,9 +1,8 @@
 import argparse
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import SITES
-from crawler import TypeACrawler, TypeBCrawler
-from db_injector import inject_json_to_db
+from crawlers import TypeACrawler, TypeBCrawler
 
 
 def get_crawler(site_info):
@@ -64,16 +63,28 @@ def main():
         print(f"🔥 [Large Batch] 대상 {site_count}개 -> 스레드 {max_workers}개 (RAM 보호 제한 적용)")
 
     # 스레드 풀 실행
+    print(f"Waiting for {site_count} tasks to complete...")
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        executor.map(run_single_site, target_sites)
+        # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받습니다.
+        future_to_site = {executor.submit(run_single_site, site): site for site in target_sites}
+
+        # 2. 작업이 끝나는 대로 결과를 확인합니다.
+        for future in as_completed(future_to_site):
+            site = future_to_site[future]
+            try:
+                future.result()  # 여기서 스레드 내부 에러가 있으면 재발생(Raise) 시킴
+            except Exception as e:
+                # 스레드가 숨기고 있던 에러를 메인 화면에 강제로 출력
+                print(f"🔥 [{site['name']}] 실행 중 치명적 오류 발생: {e}")
 
     print(f"✅ [Phase 1] 크롤링 및 JSON 저장 완료.")
 
-    # # === PHASE 2: DB Bulk Insert ===
-    print(f"🚀 [Phase 2] JSON -> DB 일괄 업로드 시작")
-    inject_json_to_db(target_sites)
-
-    print(f"🎉 모든 작업 종료.")
+    # # # === PHASE 2: DB Bulk Insert ===
+    # print(f"🚀 [Phase 2] JSON -> DB 일괄 업로드 시작")
+    # inject_json_to_db(target_sites)
+    #
+    # print(f"🎉 모든 작업 종료.")
 
 
 if __name__ == "__main__":
