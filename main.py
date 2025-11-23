@@ -2,7 +2,7 @@ import argparse
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import SITES
-from crawlers import TypeACrawler, TypeBCrawler
+from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler
 
 
 def get_crawler(site_info):
@@ -21,6 +21,8 @@ def run_single_site(site_info):
         crawler = TypeACrawler(site_info)
     elif site_info['type'] == 'B':
         crawler = TypeBCrawler(site_info)
+    elif site_info['type'] == 'C':
+        crawler = TypeCCrawler(site_info)
     else:
         return
 

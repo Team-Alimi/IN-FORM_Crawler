@@ -14,7 +14,7 @@ DB_CONFIG = {
 # 2. 타겟 키워드
 KEYWORD_CATEGORIES = {
     1: [ #LECTURE
-        "세미나", "설명회", "멘토링", "특강", "강의"
+        "세미나", "설명회", "멘토링", "특강", "강의", "워크숍"
     ],
     2: [ #CONTEST
         "공모전", "챌린지", "challenge", "프로젝트", "project"
