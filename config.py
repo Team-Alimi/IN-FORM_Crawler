@@ -30,8 +30,8 @@ SITES = [
     # === TYPE A (오전 9시 실행 그룹) ===
     {
         'type': 'A',
-        'name': 'Inha_SSE',
-        'url': 'https://sse.inha.ac.kr/sse/14301/subview.do',
+        'name': 'Inha_Engineering',
+        'url': 'https://engcollege.inha.ac.kr/engineering/9743/subview.do',
         'vendor_id': 1
     },
     {
@@ -40,7 +40,7 @@ SITES = [
         'url': 'https://mech.inha.ac.kr/mech/1823/subview.do',
         'vendor_id': 2
     },
-{
+    {
         'type': 'A',
         'name': 'Inha_AeroSpace',
         'url': 'https://aerospace.inha.ac.kr/aerospace/9846/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGYWVyb3NwYWNlJTJGMjQ4NSUyRmFydGNsTGlzdC5kbyUzRmJic0NsU2VxJTNEMTI4NyUyNmJic09wZW5XcmRTZXElM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZzcmNoQ29sdW1uJTNEc2olMjZzcmNoV3JkJTNEJTI2',
@@ -54,7 +54,7 @@ SITES = [
     },
     {
         'type': 'A',
-        'name': 'Inha_IndustrialManage',
+        'name': 'Inha_IndustrialEngine',
         'url': 'https://ie.inha.ac.kr/ie/963/subview.do',
         'vendor_id': 5
     },
@@ -119,95 +119,179 @@ SITES = [
 
     {
         'type': 'A',
+        'name': 'Inha_SSE',
+        'url': 'https://sse.inha.ac.kr/sse/14301/subview.do',
+        'vendor_id': 15
+    },
+
+    {
+        'type': 'A',
         'name': 'Inha_Swcc_Announcement',
         'url': 'https://swcc.inha.ac.kr/act/2970/subview.do',
-        'vendor_id': 15
+        'vendor_id': 16
     },
 
     {
         'type': 'A',
         'name': 'Inha_Swcc_Uni_Announcement',
         'url': 'https://swcc.inha.ac.kr/act/2971/subview.do',
-        'vendor_id': 15
+        'vendor_id': 16
     },
 
     {
         'type': 'A',
         'name': 'Inha_Ai_Announcement',
         'url': 'https://doai.inha.ac.kr/doai/3046/subview.do',
-        'vendor_id': 16
+        'vendor_id': 17
     },
 
     {
         'type': 'A',
         'name': 'Inha_Ai_Event',
         'url': 'https://doai.inha.ac.kr/doai/3047/subview.do',
-        'vendor_id': 16
+        'vendor_id': 17
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Announcement',
         'url': 'https://datascience.inha.ac.kr/datascience/3125/subview.do',
-        'vendor_id': 17
+        'vendor_id': 18
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Contest',
         'url': 'https://datascience.inha.ac.kr/datascience/11588/subview.do',
-        'vendor_id': 17
+        'vendor_id': 18
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Event',
         'url': 'https://datascience.inha.ac.kr/datascience/3126/subview.do',
-        'vendor_id': 17
+        'vendor_id': 18
     },
     {
         'type': 'A',
         'name': 'Inha_SmartMobile_Announcement',
         'url': 'https://sme.inha.ac.kr/sme/2867/subview.do',
-        'vendor_id': 18
+        'vendor_id': 19
     },
     {
         'type': 'A',
         'name': 'Inha_SmartMobile_Event',
         'url': 'https://sme.inha.ac.kr/sme/2878/subview.do',
-        'vendor_id': 18
+        'vendor_id': 19
     },
 
     {
         'type': 'A',
         'name': 'Inha_DesignTech',
         'url': 'https://designtech.inha.ac.kr/designtech/3083/subview.do',
-        'vendor_id': 19
+        'vendor_id': 20
     },
 
     {
         'type': 'A',
         'name': 'Inha_CSE_Announcement',
         'url': 'https://cse.inha.ac.kr/cse/888/subview.do',
-        'vendor_id': 20
+        'vendor_id': 21
     },
 
     {
         'type': 'A',
         'name': 'Inha_CSE_Contest',
         'url': 'https://cse.inha.ac.kr/cse/891/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGY3NlJTJGMjQ0JTJGYXJ0Y2xMaXN0LmRvJTNGYmJzQ2xTZXElM0QxNDgzNjAlMjZiYnNPcGVuV3JkU2VxJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2c3JjaENvbHVtbiUzRHNqJTI2c3JjaFdyZCUzRCUyNg%3D%3D',
-        'vendor_id': 20
+        'vendor_id': 21
     },
+
+    {
+        'type': 'A',
+        'name': 'Inha_IndustrialEngine_Event',
+        'url' : 'https://ie.inha.ac.kr/ie/979/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGaWUlMkYyNzclMkZhcnRjbExpc3QuZG8lM0ZiYnNDbFNlcSUzRDE4ODglMjZiYnNPcGVuV3JkU2VxJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2c3JjaENvbHVtbiUzRHNqJTI2c3JjaFdyZCUzRCUyNg%3D%3D',
+        'vendor_id': 5
+    },
+
+    {
+        'type': 'A',
+        'name': 'Inha_swuniv_Announcement',
+        'url': 'https://swuniv.inha.ac.kr/swuniv/12703/subview.do',
+        'vendor_id': 22
+    },
+
+    {
+        'type': 'A',
+        'name': 'Inha_swuniv_Event',
+        'url': 'https://swuniv.inha.ac.kr/swuniv/15747/subview.do',
+        'vendor_id': 22
+    },
+
+
 
     # ... A타입 사이트 30개 ...
 
     # === TYPE B (오전 12시 실행 그룹) ===
     {
         'type': 'B',
-        'name': 'Inha_FutureVehicleTech',
-        'url': 'https://fvt.inha.ac.kr/fvt/board/5',
-        'vendor_id': 21
+        'name': 'Inha_Ibattery_Announcement',
+        'url': 'http://ibattery.website.ne.kr/sub/sub04_01.php',
+        'vendor_id': 23
     },
+
+    {
+        'type': 'B',
+        'name': 'Inha_Ibattery_Event',
+        'url': 'http://ibattery.website.ne.kr/sub/sub04_02.php',
+        'vendor_id': 23
+    },
+
+
+
+    # ... B타입 사이트 2개 ...
+
+    # === TYPE C (오전 12시 실행 그룹) ===
+    {
+        'type': 'C',
+        'name': 'Inha_FVT',
+        'url': 'https://fvt.inha.ac.kr/fvt/board/5',
+        'vendor_id': 24
+    },
+
+
+
+    # ... C타입 사이트 1개 ...
+
+    # === TYPE D (오전 12시 실행 그룹) ===
+    {
+        'type': 'D',
+        'name': 'Inha_SE',
+        'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01&cate=4&per_page=1',
+        'vendor_id': 25
+    },
+
+
+
+    # ... D타입 사이트 1개 ...
+
+    # === TYPE E (오전 12시 실행 그룹) ===
+    {
+        'type': 'E',
+        'name': 'Inha_JOB_Course',
+        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx?prodiv=1',
+        'vendor_id': 26
+    },
+
+    {
+        'type': 'E',
+        'name': 'Inha_Job_EMP',
+        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx?prodiv=2',
+        'vendor_id': 26
+    }
+
+
+
+    # ... E타입 사이트 2개 ...
 ]
 
 # 4. 크롤링 결과 JSON으로 저장
