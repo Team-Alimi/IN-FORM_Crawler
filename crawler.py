@@ -65,6 +65,47 @@ class BaseCrawler:
         # 이 메서드는 자식 클래스(TypeACrawler 등)에서 반드시 덮어써야 함
         raise NotImplementedError
 
+    def _parse_detail_page(self, list_title, category):
+        soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+
+        # 본문
+        content_div = soup.select_one('.artclView')
+        content = content_div.get_text('\n', strip=True) if content_div else ""
+
+        # 작성일, 수정일 추출
+        created_at = datetime.now().strftime('%Y-%m-%d')
+        updated_at = created_at
+
+        dls = soup.select('.artclViewHead dl')
+        for dl in dls:
+            dt = dl.select_one('dt')
+            dd = dl.select_one('dd')
+            if not dt or not dd: continue
+
+            label = dt.get_text(strip=True)
+            val = dd.get_text(strip=True)
+
+            if '작성일' in label:
+                created_at = val.replace('.', '-')
+            elif '수정일' in label:
+                updated_at = val.replace('.', '-')
+
+        # JSON 포맷에 맞게 시간 정보 추가 (DB 인젝터에서 처리)
+        if len(created_at) <= 10: created_at += " 00:00:00"
+        if len(updated_at) <= 10: updated_at += " 00:00:00"
+
+        # 리스트에 저장
+        self.collected_data.append({
+            'title': list_title,
+            'content': content,
+            'original_url': self.driver.current_url,
+            'created_at': created_at,
+            'updated_at': updated_at,
+            'vendor_id': self.vendor_id,
+            'category_id': category
+        })
+        print(f"   ---> 수집 성공: {list_title} (Category: {category})")
+
 
 class TypeACrawler(BaseCrawler):
     def crawl(self):
@@ -215,21 +256,22 @@ class TypeACrawler(BaseCrawler):
 
 class TypeBCrawler(BaseCrawler):
     """
-    Type B 크롤러: URL: https://fvt.inha.ac.kr/fvt/board/5
-    특정 CSS 선택자를 사용하는 게시판 구조를 가정하고 구현합니다.
+    Type B 크롤러: URL: https://fvt.inha.ac.kr/fvt/board/5 에 맞게 커스터마이징
+    - 게시글 행: #tablelist > tbody > tr
+    - 제목/링크: td.text-left a
+    - 날짜: 4번째 TD
     """
 
-    # ❗ [중요] 아래 CSS 선택자들은 가정한 값입니다. 실제 웹사이트 구조에 맞게 수정해야 합니다.
-    # 개발자 도구(F12)로 확인 후, 필요에 따라 수정해 주세요.
-    LIST_ROW_SELECTOR = '#tablelist > tbody > tr'  # 각 게시글 행을 선택 (헤더 제외)
-    DATE_SELECTOR = 'td:nth-child(4)'  # 날짜가 들어있는 요소
-    TITLE_LINK_SELECTOR = 'td.text-left a'  # 제목 텍스트와 링크를 포함하는 요소
+    # [확정된 선택자]
+    LIST_ROW_SELECTOR = '#tablelist > tbody > tr'
+    TITLE_LINK_SELECTOR = 'td.text-left a'
+    DATE_CELL_SELECTOR = 'td:nth-child(4)'
 
     def crawl(self):
         self.driver.get(self.url)
         time.sleep(3)
 
-        # 날짜 제한 계산 (현재 - 2개월) - Type A와 동일
+        # 날짜 제한 계산 (Type A와 동일)
         now = datetime.now()
         limit_date = now - relativedelta(months=2)
         limit_date = limit_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -243,29 +285,32 @@ class TypeBCrawler(BaseCrawler):
             print(f"\n📄 [{self.site_name}] {page} 페이지 스캔 중...")
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-            # 1. 목록 행 추출 (가정된 선택자 사용)
-            rows = soup.select(self.LIST_ROW_SELECTOR)
+            # 1. 목록 행 추출 (헤더 포함 가능성이 높음)
+            all_rows = soup.select(self.LIST_ROW_SELECTOR)
 
-            if not rows:
+            # [수정] 첫 번째 행(헤더)은 데이터가 아니므로 스킵합니다.
+            data_rows = all_rows[1:]
+
+            if not data_rows:
                 print(f"⚠️ [{self.site_name}] 게시글 행을 찾지 못했습니다. 종료.")
                 break
 
             page_processed_count = 0
 
-            for i, row in enumerate(rows):
-                # 2. 날짜, 제목, 링크 추출
-                date_cell = row.select_one(self.DATE_SELECTOR)
-                title_link = row.select_one(self.TITLE_LINK_SELECTOR)
+            # enumerate(data_rows)는 0부터 시작하지만, 실제 DOM 내에서는 2번째 TR부터 시작합니다.
+            for i, row in enumerate(data_rows):
 
-                if not date_cell or not title_link:
+                title_link_element = row.select_one(self.TITLE_LINK_SELECTOR)
+                date_cell = row.select_one(self.DATE_CELL_SELECTOR)
+
+                if not title_link_element or not date_cell:
                     continue
 
                 date_text = date_cell.get_text(strip=True)
-                title_text = title_link.get_text(strip=True)
+                title_text = title_link_element.get_text(strip=True)
 
-                # 3. 날짜 검증 (Type A와 동일한 YYYY.MM.DD 형식 가정)
+                # 3. 날짜 검증
                 try:
-                    # Type B는 날짜 형식이 'YYYY-MM-DD' 또는 'YYYY.MM.DD'일 가능성이 높습니다.
                     article_date = datetime.strptime(date_text.replace('-', '.'), '%Y.%m.%d')
 
                     if article_date < limit_date:
@@ -277,11 +322,9 @@ class TypeBCrawler(BaseCrawler):
                     else:
                         consecutive_old_posts = 0
                 except ValueError:
-                    # 날짜 파싱 실패 시 경고 후 스킵
-                    # print(f"   Pass: {title_text[:10]}... ({date_text}) - 날짜 형식 오류")
                     continue
 
-                # 4. 키워드 & 카테고리 ID 검증 및 추출 (KEYWORD_MAPPINGS 사용)
+                # 4. 키워드 & 카테고리 ID 검증 및 추출
                 matching_category_id = None
 
                 for category_id, keywords in KEYWORD_CATEGORIES.items():
@@ -292,42 +335,37 @@ class TypeBCrawler(BaseCrawler):
                 if not matching_category_id:
                     continue
 
-                # 5. 상세 수집 시작 (Type B는 목록 링크가 절대 URL이 아닐 수 있으므로 클릭 방식을 사용)
+                # 5. 상세 수집 시작
                 try:
-                    # Selenium으로 해당 링크 요소 찾기 (i는 0부터 시작)
-                    # XPath 대신 CSS 선택자를 그대로 사용:
-                    link_xpath = f'{self.LIST_ROW_SELECTOR}:nth-child({i + 2}) {self.TITLE_LINK_SELECTOR}'
+                    # [수정] DOM 상의 정확한 위치 (i=0은 2번째 TR이므로 i+2 사용)
+                    dom_index = i + 2
+                    link_xpath = f'{self.LIST_ROW_SELECTOR}:nth-child({dom_index}) {self.TITLE_LINK_SELECTOR}'
 
-                    # Type B는 CSS 선택자가 명확하지 않을 수 있으므로, 재시도 로직을 사용하여 링크 클릭
                     link = self.driver.find_element(By.CSS_SELECTOR, link_xpath)
 
                     self.driver.execute_script("arguments[0].scrollIntoView(true);", link)
                     self.driver.execute_script("arguments[0].click();", link)
 
-                    time.sleep(2)  # Type B 사이트는 로딩이 느릴 수 있으므로 2초 대기
+                    time.sleep(2)
 
-                    # 상세 페이지 파싱 (BaseCrawler의 공통 메서드 호출)
                     self._parse_detail_page(title_text, matching_category_id)
                     page_processed_count += 1
 
-                    # 뒤로 가기
                     self.driver.back()
                     time.sleep(1)
 
                 except Exception as e:
                     print(f"⚠️ 상세 진입 실패 ({title_text}): {e}")
-                    # 에러 나면 안전하게 목록으로 다시 로드
                     self.driver.get(self.url)
                     time.sleep(2)
 
             if page_processed_count == 0:
                 print(f"   (ℹ️ {page} 페이지: 수집된 글 없음)")
 
-            # 6. 다음 페이지 이동 (가정된 선택자 사용)
+            # 6. 다음 페이지 이동
             page += 1
             try:
-                # 다음 페이지 버튼 선택자 가정: 'page' 함수를 포함하고, 현재 페이지 번호인 'page'를 텍스트로 가지는 버튼
-                # ❗ [중요] Type A와 동일한 방식의 페이지네이션 버튼을 사용한다고 가정합니다.
+                # Type A와 동일한 페이지네이션 방식을 가정 (일단 시도)
                 next_btn = self.driver.find_element(By.XPATH, f'//a[contains(@onclick, "page") and text()="{page}"]')
                 next_btn.click()
                 time.sleep(2)
