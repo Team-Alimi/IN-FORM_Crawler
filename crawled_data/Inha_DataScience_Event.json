@@ -5,8 +5,8 @@
         "original_url": "https://datascience.inha.ac.kr/datascience/3126/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZGF0YXNjaWVuY2UlMkY3NDUlMkYxNjYxMDglMkZhcnRjbFZpZXcuZG8lM0ZwYWdlJTNEMSUyNnNyY2hDb2x1bW4lM0QlMjZzcmNoV3JkJTNEJTI2YmJzQ2xTZXElM0QlMjZiYnNPcGVuV3JkU2VxJTNEJTI2cmdzQmduZGVTdHIlM0QlMjZyZ3NFbmRkZVN0ciUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnBhc3N3b3JkJTNEJTI2",
         "created_at": "2025-11-18",
         "updated_at": "2025-11-18",
-        "vendor_id": 22,
-        "category": 1
+        "vendor_id": 17,
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 첨단산업 외투(외국인 투자)기업 권역별 채용상담회&설명회",
@@ -14,8 +14,8 @@
         "original_url": "https://datascience.inha.ac.kr/datascience/3126/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZGF0YXNjaWVuY2UlMkY3NDUlMkYxNjU1ODYlMkZhcnRjbFZpZXcuZG8lM0ZwYWdlJTNEMSUyNnNyY2hDb2x1bW4lM0QlMjZzcmNoV3JkJTNEJTI2YmJzQ2xTZXElM0QlMjZiYnNPcGVuV3JkU2VxJTNEJTI2cmdzQmduZGVTdHIlM0QlMjZyZ3NFbmRkZVN0ciUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnBhc3N3b3JkJTNEJTI2",
         "created_at": "2025-11-10",
         "updated_at": "2025-11-10",
-        "vendor_id": 22,
-        "category": 1
+        "vendor_id": 17,
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 항공산업 인천권역 현직자 멘토링 홍보 협조 요청",
@@ -23,8 +23,8 @@
         "original_url": "https://datascience.inha.ac.kr/datascience/3126/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZGF0YXNjaWVuY2UlMkY3NDUlMkYxNjQzNzUlMkZhcnRjbFZpZXcuZG8lM0ZwYWdlJTNEMSUyNnNyY2hDb2x1bW4lM0QlMjZzcmNoV3JkJTNEJTI2YmJzQ2xTZXElM0QlMjZiYnNPcGVuV3JkU2VxJTNEJTI2cmdzQmduZGVTdHIlM0QlMjZyZ3NFbmRkZVN0ciUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnBhc3N3b3JkJTNEJTI2",
         "created_at": "2025-10-24",
         "updated_at": "2025-10-24",
-        "vendor_id": 22,
-        "category": 1
+        "vendor_id": 17,
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 아모레퍼시픽 본사 견학 및 직무 멘토링 프로그램 안내",
@@ -32,7 +32,7 @@
         "original_url": "https://datascience.inha.ac.kr/datascience/3126/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZGF0YXNjaWVuY2UlMkY3NDUlMkYxNjQyNzIlMkZhcnRjbFZpZXcuZG8lM0ZwYWdlJTNEMSUyNnNyY2hDb2x1bW4lM0QlMjZzcmNoV3JkJTNEJTI2YmJzQ2xTZXElM0QlMjZiYnNPcGVuV3JkU2VxJTNEJTI2cmdzQmduZGVTdHIlM0QlMjZyZ3NFbmRkZVN0ciUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnBhc3N3b3JkJTNEJTI2",
         "created_at": "2025-10-24",
         "updated_at": "2025-10-24",
-        "vendor_id": 22,
-        "category": 1
+        "vendor_id": 17,
+        "category_id": 1
     }
 ]

@@ -6,7 +6,7 @@
         "created_at": "2025-11-03",
         "updated_at": "2025-11-03",
         "vendor_id": 3,
-        "category": 2
+        "category_id": 2
     },
     {
         "title": "[학 부][현장실습지원센터] 2025학년도 하반기 표준 현장실습학기제 학생설명회새글",
@@ -15,7 +15,7 @@
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
         "vendor_id": 3,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[학 부] 2026년 2월 졸업심사 대상자 영어졸업인증 대체특강 안내",
@@ -24,7 +24,7 @@
         "created_at": "2025-11-06",
         "updated_at": "2025-11-06",
         "vendor_id": 3,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[학 부] ★2025-2 항공우주종합설계2/다학년프로젝트 예산 사용 서류 제출 안내",
@@ -33,6 +33,6 @@
         "created_at": "2025-11-03",
         "updated_at": "2025-11-03",
         "vendor_id": 3,
-        "category": 2
+        "category_id": 2
     }
 ]

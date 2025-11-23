@@ -6,7 +6,7 @@
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
         "vendor_id": 7,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[이차전지특성화대학사업단] 특성화이차전지공학 전공설명회 안내",
@@ -15,7 +15,7 @@
         "created_at": "2025-11-10",
         "updated_at": "2025-11-10",
         "vendor_id": 7,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "고분자환경융합공학전공 대학원 설명회 개최 안내 (11/20)",
@@ -24,7 +24,7 @@
         "created_at": "2025-11-10",
         "updated_at": "2025-11-10",
         "vendor_id": 7,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "2026년 2월 졸업심사 대상자 영어졸업인증 대체특강 안내",
@@ -33,6 +33,6 @@
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
         "vendor_id": 7,
-        "category": 1
+        "category_id": 1
     }
 ]

@@ -5,8 +5,8 @@
         "original_url": "https://sme.inha.ac.kr/sme/2867/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGc21lJTJGNzAzJTJGMTY1MzA2JTJGYXJ0Y2xWaWV3LmRvJTNGcGFnZSUzRDElMjZzcmNoQ29sdW1uJTNEJTI2c3JjaFdyZCUzRCUyNmJic0NsU2VxJTNEJTI2YmJzT3BlbldyZFNlcSUzRCUyNnJnc0JnbmRlU3RyJTNEJTI2cmdzRW5kZGVTdHIlM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZwYXNzd29yZCUzRCUyNg%3D%3D",
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
-        "vendor_id": 23,
-        "category": 1
+        "vendor_id": 18,
+        "category_id": 1
     },
     {
         "title": "현장실습학기제 학생 설명회새글",
@@ -14,8 +14,8 @@
         "original_url": "https://sme.inha.ac.kr/sme/2867/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGc21lJTJGNzAzJTJGMTY1OTcxJTJGYXJ0Y2xWaWV3LmRvJTNGcGFnZSUzRDElMjZzcmNoQ29sdW1uJTNEJTI2c3JjaFdyZCUzRCUyNmJic0NsU2VxJTNEJTI2YmJzT3BlbldyZFNlcSUzRCUyNnJnc0JnbmRlU3RyJTNEJTI2cmdzRW5kZGVTdHIlM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZwYXNzd29yZCUzRCUyNg%3D%3D",
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
-        "vendor_id": 23,
-        "category": 1
+        "vendor_id": 18,
+        "category_id": 1
     },
     {
         "title": "영어졸업인증 대체특강 신청안내(2026년 2월 졸업심사대상자)",
@@ -23,8 +23,8 @@
         "original_url": "https://sme.inha.ac.kr/sme/2867/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGc21lJTJGNzAzJTJGMTY1MzA2JTJGYXJ0Y2xWaWV3LmRvJTNGcGFnZSUzRDElMjZzcmNoQ29sdW1uJTNEJTI2c3JjaFdyZCUzRCUyNmJic0NsU2VxJTNEJTI2YmJzT3BlbldyZFNlcSUzRCUyNnJnc0JnbmRlU3RyJTNEJTI2cmdzRW5kZGVTdHIlM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZwYXNzd29yZCUzRCUyNg%3D%3D",
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
-        "vendor_id": 23,
-        "category": 1
+        "vendor_id": 18,
+        "category_id": 1
     },
     {
         "title": "2026 전국 대학생 자작미래자동차 경진대회",
@@ -32,7 +32,7 @@
         "original_url": "https://sme.inha.ac.kr/sme/2867/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGc21lJTJGNzAzJTJGMTY0NzkyJTJGYXJ0Y2xWaWV3LmRvJTNGcGFnZSUzRDElMjZzcmNoQ29sdW1uJTNEJTI2c3JjaFdyZCUzRCUyNmJic0NsU2VxJTNEJTI2YmJzT3BlbldyZFNlcSUzRCUyNnJnc0JnbmRlU3RyJTNEJTI2cmdzRW5kZGVTdHIlM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZwYXNzd29yZCUzRCUyNg%3D%3D",
         "created_at": "2025-10-29",
         "updated_at": "2025-10-29",
-        "vendor_id": 23,
-        "category": 3
+        "vendor_id": 18,
+        "category_id": 3
     }
 ]

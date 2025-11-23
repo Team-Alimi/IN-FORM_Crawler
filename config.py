@@ -1,4 +1,5 @@
 import os
+import pymysql.cursors
 
 # 1. 데이터베이스 설정
 DB_CONFIG = {
@@ -7,7 +8,7 @@ DB_CONFIG = {
     'password': 'your_password',
     'db': 'your_db_name',
     'charset': 'utf8mb4',
-    'cursorclass': 'pymysql.cursors.DictCursor'
+    'cursorclass': pymysql.cursors.DictCursor
 }
 
 # 2. 타겟 키워드
@@ -39,7 +40,7 @@ SITES = [
         'url': 'https://mech.inha.ac.kr/mech/1823/subview.do',
         'vendor_id': 2
     },
-    {
+{
         'type': 'A',
         'name': 'Inha_AeroSpace',
         'url': 'https://aerospace.inha.ac.kr/aerospace/9846/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGYWVyb3NwYWNlJTJGMjQ4NSUyRmFydGNsTGlzdC5kbyUzRmJic0NsU2VxJTNEMTI4NyUyNmJic09wZW5XcmRTZXElM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZzcmNoQ29sdW1uJTNEc2olMjZzcmNoV3JkJTNEJTI2',
@@ -115,93 +116,87 @@ SITES = [
         'url': 'https://ee.inha.ac.kr/eee/16344/subview.do',
         'vendor_id': 14
     },
-    {
-        'type': 'A',
-        'name': 'Inha_SemiConductor',
-        'url': 'https://sse.inha.ac.kr/sse/14301/subview.do',
-        'vendor_id': 15
-    },
 
     {
         'type': 'A',
         'name': 'Inha_Swcc_Announcement',
         'url': 'https://swcc.inha.ac.kr/act/2970/subview.do',
-        'vendor_id': 16
+        'vendor_id': 15
     },
 
     {
         'type': 'A',
         'name': 'Inha_Swcc_Uni_Announcement',
         'url': 'https://swcc.inha.ac.kr/act/2971/subview.do',
-        'vendor_id': 17
+        'vendor_id': 15
     },
 
     {
         'type': 'A',
         'name': 'Inha_Ai_Announcement',
         'url': 'https://doai.inha.ac.kr/doai/3046/subview.do',
-        'vendor_id': 18
+        'vendor_id': 16
     },
 
     {
         'type': 'A',
         'name': 'Inha_Ai_Event',
         'url': 'https://doai.inha.ac.kr/doai/3047/subview.do',
-        'vendor_id': 19
+        'vendor_id': 16
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Announcement',
         'url': 'https://datascience.inha.ac.kr/datascience/3125/subview.do',
-        'vendor_id': 20
+        'vendor_id': 17
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Contest',
         'url': 'https://datascience.inha.ac.kr/datascience/11588/subview.do',
-        'vendor_id': 21
+        'vendor_id': 17
     },
 
     {
         'type': 'A',
         'name': 'Inha_DataScience_Event',
         'url': 'https://datascience.inha.ac.kr/datascience/3126/subview.do',
-        'vendor_id': 22
+        'vendor_id': 17
     },
     {
         'type': 'A',
         'name': 'Inha_SmartMobile_Announcement',
         'url': 'https://sme.inha.ac.kr/sme/2867/subview.do',
-        'vendor_id': 23
+        'vendor_id': 18
     },
     {
         'type': 'A',
         'name': 'Inha_SmartMobile_Event',
         'url': 'https://sme.inha.ac.kr/sme/2878/subview.do',
-        'vendor_id': 24
+        'vendor_id': 18
     },
 
     {
         'type': 'A',
         'name': 'Inha_DesignTech',
         'url': 'https://designtech.inha.ac.kr/designtech/3083/subview.do',
-        'vendor_id': 25
+        'vendor_id': 19
     },
 
     {
         'type': 'A',
         'name': 'Inha_CSE_Announcement',
         'url': 'https://cse.inha.ac.kr/cse/888/subview.do',
-        'vendor_id': 26
+        'vendor_id': 20
     },
 
     {
         'type': 'A',
         'name': 'Inha_CSE_Contest',
         'url': 'https://cse.inha.ac.kr/cse/891/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGY3NlJTJGMjQ0JTJGYXJ0Y2xMaXN0LmRvJTNGYmJzQ2xTZXElM0QxNDgzNjAlMjZiYnNPcGVuV3JkU2VxJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2c3JjaENvbHVtbiUzRHNqJTI2c3JjaFdyZCUzRCUyNg%3D%3D',
-        'vendor_id': 27
+        'vendor_id': 20
     },
 
     # ... A타입 사이트 30개 ...
@@ -209,9 +204,9 @@ SITES = [
     # === TYPE B (오전 12시 실행 그룹) ===
     {
         'type': 'B',
-        'name': 'Battery_Center',
-        'url': 'http://ibattery.website.ne.kr/sub/sub04_01.php',
-        'vendor_id': 99
+        'name': 'Inha_FutureVehicleTech',
+        'url': 'https://fvt.inha.ac.kr/fvt/board/5',
+        'vendor_id': 21
     },
 ]
 

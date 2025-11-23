@@ -6,7 +6,7 @@
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[이차전지특성화대학사업단] 특성화이차전지공학 전공설명회 안내",
@@ -15,7 +15,7 @@
         "created_at": "2025-11-11",
         "updated_at": "2025-11-11",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 첨단산업 외투(외국인 투자)기업 권역별 채용상담회&설명회 안내",
@@ -24,7 +24,7 @@
         "created_at": "2025-11-10",
         "updated_at": "2025-11-10",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "2026년 2월 졸업심사 대상자 영어졸업인증 대체특강 안내",
@@ -33,7 +33,7 @@
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 현직자 초청 특강 홍보 협조 요청(주제: 트럼프의 관세 정책에 대응한 우리나",
@@ -42,7 +42,7 @@
         "created_at": "2025-11-04",
         "updated_at": "2025-11-04",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "국가 연구개발 전략 세미나 개최 안내",
@@ -51,6 +51,6 @@
         "created_at": "2025-10-28",
         "updated_at": "2025-10-28",
         "vendor_id": 8,
-        "category": 1
+        "category_id": 1
     }
 ]

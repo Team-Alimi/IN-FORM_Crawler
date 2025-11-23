@@ -6,7 +6,7 @@
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
         "vendor_id": 12,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[건축학부] 2025 공과대학 쇼츠 영상 공모전 시행 공고",
@@ -15,7 +15,7 @@
         "created_at": "2025-09-29",
         "updated_at": "2025-09-29",
         "vendor_id": 12,
-        "category": 2
+        "category_id": 2
     },
     {
         "title": "[건축학부] 2025년 하반기 삼성그룹 등 대기업 직무적성검사 대비 파이널 특강 안내",
@@ -24,7 +24,7 @@
         "created_at": "2025-09-26",
         "updated_at": "2025-09-26",
         "vendor_id": 12,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[건축학부] 2025-2학기「학기 중 강의진단」시행 안내",
@@ -33,6 +33,6 @@
         "created_at": "2025-09-24",
         "updated_at": "2025-09-24",
         "vendor_id": 12,
-        "category": 1
+        "category_id": 1
     }
 ]

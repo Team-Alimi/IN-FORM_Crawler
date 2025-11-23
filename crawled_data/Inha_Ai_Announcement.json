@@ -5,8 +5,8 @@
         "original_url": "https://doai.inha.ac.kr/doai/3046/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZG9haSUyRjczMSUyRjE2NTkyOSUyRmFydGNsVmlldy5kbyUzRnBhZ2UlM0QxJTI2c3JjaENvbHVtbiUzRCUyNnNyY2hXcmQlM0QlMjZiYnNDbFNlcSUzRCUyNmJic09wZW5XcmRTZXElM0QlMjZyZ3NCZ25kZVN0ciUzRCUyNnJnc0VuZGRlU3RyJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2cGFzc3dvcmQlM0QlMjY%3D",
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
-        "vendor_id": 18,
-        "category": 1
+        "vendor_id": 16,
+        "category_id": 1
     },
     {
         "title": "[안내] 영어졸업인증 대체특강 신청안내",
@@ -14,7 +14,7 @@
         "original_url": "https://doai.inha.ac.kr/doai/3046/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZG9haSUyRjczMSUyRjE2NTMxMiUyRmFydGNsVmlldy5kbyUzRnBhZ2UlM0QxJTI2c3JjaENvbHVtbiUzRCUyNnNyY2hXcmQlM0QlMjZiYnNDbFNlcSUzRCUyNmJic09wZW5XcmRTZXElM0QlMjZyZ3NCZ25kZVN0ciUzRCUyNnJnc0VuZGRlU3RyJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2cGFzc3dvcmQlM0QlMjY%3D",
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
-        "vendor_id": 18,
-        "category": 1
+        "vendor_id": 16,
+        "category_id": 1
     }
 ]

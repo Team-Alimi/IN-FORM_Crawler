@@ -6,7 +6,7 @@
         "created_at": "2025-10-21",
         "updated_at": "2025-10-21",
         "vendor_id": 1,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[학사안내]2025-2학기 「학기 중 강의진단」시행 안내",
@@ -15,7 +15,7 @@
         "created_at": "2025-09-24",
         "updated_at": "2025-09-24",
         "vendor_id": 1,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[교내활동]' 자동차기업 5개 회사_현직자 직무 특강 및 멘토링' 시행 안내",
@@ -24,7 +24,7 @@
         "created_at": "2025-09-09",
         "updated_at": "2025-09-09",
         "vendor_id": 1,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[교내활동]학사경고 학생 대상 런!런! 챌린지 프로그램 참여 안내",
@@ -33,7 +33,7 @@
         "created_at": "2025-09-05",
         "updated_at": "2025-09-05",
         "vendor_id": 1,
-        "category": 2
+        "category_id": 2
     },
     {
         "title": "[공지사항]2025학년도 2학기 학부 학기초 강의진단 시행",
@@ -42,6 +42,6 @@
         "created_at": "2025-09-05",
         "updated_at": "2025-09-05",
         "vendor_id": 1,
-        "category": 1
+        "category_id": 1
     }
 ]

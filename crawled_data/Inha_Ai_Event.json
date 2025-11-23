@@ -5,8 +5,8 @@
         "original_url": "https://doai.inha.ac.kr/doai/3047/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZG9haSUyRjcyOSUyRjE2NTY2MiUyRmFydGNsVmlldy5kbyUzRnBhZ2UlM0QxJTI2c3JjaENvbHVtbiUzRCUyNnNyY2hXcmQlM0QlMjZiYnNDbFNlcSUzRCUyNmJic09wZW5XcmRTZXElM0QlMjZyZ3NCZ25kZVN0ciUzRCUyNnJnc0VuZGRlU3RyJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2cGFzc3dvcmQlM0QlMjY%3D",
         "created_at": "2025-11-11",
         "updated_at": "2025-11-11",
-        "vendor_id": 19,
-        "category": 1
+        "vendor_id": 16,
+        "category_id": 1
     },
     {
         "title": "2025-2학기 「i-PAC 인증 콘테스트」참여 신청 (~10.31.)",
@@ -14,8 +14,8 @@
         "original_url": "https://doai.inha.ac.kr/doai/3047/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZG9haSUyRjcyOSUyRjE2Mzc0NyUyRmFydGNsVmlldy5kbyUzRnBhZ2UlM0QxJTI2c3JjaENvbHVtbiUzRCUyNnNyY2hXcmQlM0QlMjZiYnNDbFNlcSUzRCUyNmJic09wZW5XcmRTZXElM0QlMjZyZ3NCZ25kZVN0ciUzRCUyNnJnc0VuZGRlU3RyJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2cGFzc3dvcmQlM0QlMjY%3D",
         "created_at": "2025-10-15",
         "updated_at": "2025-10-15",
-        "vendor_id": 19,
-        "category": 3
+        "vendor_id": 16,
+        "category_id": 3
     },
     {
         "title": "[모집] H100 GPU 16장을 활용한 생성형 모델 프로젝트 (10월-12월) 참여 학생",
@@ -23,7 +23,7 @@
         "original_url": "https://doai.inha.ac.kr/doai/3047/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZG9haSUyRjcyOSUyRjE2Mjk4OCUyRmFydGNsVmlldy5kbyUzRnBhZ2UlM0QxJTI2c3JjaENvbHVtbiUzRCUyNnNyY2hXcmQlM0QlMjZiYnNDbFNlcSUzRCUyNmJic09wZW5XcmRTZXElM0QlMjZyZ3NCZ25kZVN0ciUzRCUyNnJnc0VuZGRlU3RyJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2cGFzc3dvcmQlM0QlMjY%3D",
         "created_at": "2025-09-26",
         "updated_at": "2025-09-26",
-        "vendor_id": 19,
-        "category": 2
+        "vendor_id": 16,
+        "category_id": 2
     }
 ]
