@@ -249,7 +249,7 @@ class TypeACrawler(BaseCrawler):
             'created_at': created_at,
             'updated_at': updated_at,
             'vendor_id': self.vendor_id,
-            'category': category
+            'category_id': category
         })
         print(f"   ---> 수집 성공: {list_title} (Category: {category})")
 

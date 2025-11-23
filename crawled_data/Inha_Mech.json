@@ -6,7 +6,7 @@
         "created_at": "2025-11-17",
         "updated_at": "2025-11-17",
         "vendor_id": 2,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "2025-2학기 인하대학교 기계공학과 대학원 정기세미나 안내(11.17_학부생 참여가능)",
@@ -15,7 +15,7 @@
         "created_at": "2025-11-14",
         "updated_at": "2025-11-14",
         "vendor_id": 2,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "2026년 2월 졸업심사 대상자 영어졸업인증 대체특강 안내",
@@ -24,7 +24,7 @@
         "created_at": "2025-11-05",
         "updated_at": "2025-11-05",
         "vendor_id": 2,
-        "category": 1
+        "category_id": 1
     },
     {
         "title": "[인재개발팀] 현직자 초청 특강 안내(주제: 트럼프의 관세 정책에 대응한 우리나라 관세행정",
@@ -33,6 +33,6 @@
         "created_at": "2025-11-03",
         "updated_at": "2025-11-03",
         "vendor_id": 2,
-        "category": 1
+        "category_id": 1
     }
 ]
