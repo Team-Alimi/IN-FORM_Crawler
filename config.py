@@ -266,7 +266,7 @@ SITES = [
     {
         'type': 'D',
         'name': 'Inha_SE',
-        'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01&cate=4&per_page=1',
+        'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01',
         'vendor_id': 25
     },
 
@@ -277,15 +277,8 @@ SITES = [
     # === TYPE E (오전 12시 실행 그룹) ===
     {
         'type': 'E',
-        'name': 'Inha_JOB_Course',
-        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx?prodiv=1',
-        'vendor_id': 26
-    },
-
-    {
-        'type': 'E',
-        'name': 'Inha_Job_EMP',
-        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx?prodiv=2',
+        'name': 'Inha_JOB',
+        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx',
         'vendor_id': 26
     }
 

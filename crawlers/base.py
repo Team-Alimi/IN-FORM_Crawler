@@ -25,6 +25,7 @@ class BaseCrawler:
         self.wait = None
 
     def _init_driver(self):
+        """브라우저 드라이버 초기화 및 옵션 설정"""
         options = Options()
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
@@ -35,6 +36,7 @@ class BaseCrawler:
         self.wait = WebDriverWait(self.driver, 10)
 
     def save_to_json(self):
+        """수집 데이터를 JSON 파일로 저장"""
         if not self.collected_data:
             print(f"⚠️ [{self.site_name}] 수집된 데이터가 없어 파일을 생성하지 않습니다.")
             return
@@ -48,6 +50,7 @@ class BaseCrawler:
             print(f"❌ [{self.site_name}] JSON 저장 실패: {e}")
 
     def run(self):
+        """크롤러 실행 메인 흐름"""
         try:
             self._init_driver()
             self.crawl()
@@ -66,9 +69,7 @@ class BaseCrawler:
     def crawl(self):
         raise NotImplementedError
 
-
-    # ================= [공통 유틸리티 메서드] =================
-
+    # ================= [공통 유틸리티] =================
 
     def get_limit_date(self):
         """2개월 전 1일 날짜 반환 (시간 00:00:00)"""
@@ -77,10 +78,7 @@ class BaseCrawler:
         return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     def parse_date_raw(self, date_text):
-        """
-            문자열을 datetime 객체로 변환하되, 시간은 00:00:00으로 초기화
-            비교 로직의 일관성을 위해 시간 정보는 제거함
-        """
+        """다양한 날짜 문자열을 datetime 객체로 변환 (시간 정보 제거)"""
         if not date_text: return None
         date_text = date_text.strip()
 
@@ -94,39 +92,36 @@ class BaseCrawler:
         for fmt in formats:
             try:
                 dt = datetime.strptime(date_text, fmt)
-                # 시간 정보를 제거하여 비교 및 저장의 일관성 확보
                 return dt.replace(hour=0, minute=0, second=0, microsecond=0)
             except ValueError:
                 continue
         return None
 
     def format_date_str(self, date_obj):
-        """
-            datetime 객체를 DB 저장용 'YYYY-MM-DD' 문자열로 변환
-        """
-        if date_obj is None:
-            return None
+        """datetime 객체를 DB 저장용 'YYYY-MM-DD' 문자열로 변환"""
+        if date_obj is None: return None
         return date_obj.strftime("%Y-%m-%d")
 
     def match_category(self, title_text):
-        """
-            제목에서 키워드를 찾아 카테고리 ID 반환
-        """
+        """제목 키워드 기반 카테고리 매칭"""
         for cat_id, keywords in KEYWORD_CATEGORIES.items():
             if any(kw in title_text for kw in keywords):
                 return cat_id
         return None
 
     def wait_element(self, by, selector, timeout=10):
+        """단일 요소 대기 및 반환"""
         return WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located((by, selector))
         )
 
     def wait_elements(self, by, selector, timeout=10):
+        """복수 요소 대기 및 반환"""
         return WebDriverWait(self.driver, timeout).until(
             EC.presence_of_all_elements_located((by, selector))
         )
 
     def js_click(self, element):
+        """JavaScript 강제 클릭"""
         self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
         self.driver.execute_script("arguments[0].click();", element)
