@@ -87,6 +87,11 @@ class TypeBCrawler(BaseCrawler):
         content = soup.select_one('.board-view-cnt').get_text('\n', strip=True) if soup.select_one(
             '.board-view-cnt') else ""
 
+        # [내용이 없는 게시글은 패스]
+        if not content:
+            print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
+            return
+
         if date_obj is None: date_obj = datetime.now()
         date_str = self.format_date_str(date_obj)
 

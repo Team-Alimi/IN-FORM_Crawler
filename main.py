@@ -3,6 +3,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import SITES
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
+from db_injector import inject_json_to_db
 
 
 def get_crawler(site_info):
@@ -86,11 +87,11 @@ def main():
 
     print(f"✅ [Phase 1] 크롤링 및 JSON 저장 완료.")
 
-    # # # === PHASE 2: DB Bulk Insert ===
-    # print(f"🚀 [Phase 2] JSON -> DB 일괄 업로드 시작")
-    # inject_json_to_db(target_sites)
-    #
-    # print(f"🎉 모든 작업 종료.")
+    ## === PHASE 2: DB Bulk Insert ===
+    print(f"🚀 [Phase 2] JSON -> DB 일괄 업로드 시작")
+    inject_json_to_db(target_sites)
+
+    print(f"🎉 모든 작업 종료.")
 
 
 if __name__ == "__main__":

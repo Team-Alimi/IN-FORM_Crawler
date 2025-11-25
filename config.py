@@ -6,7 +6,7 @@ DB_CONFIG = {
     'host': '20.249.161.76',
     'port': 13306,
     'user': 'root',
-    'password': '1234',
+    'password': '',
     'db': 'informserver',
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor

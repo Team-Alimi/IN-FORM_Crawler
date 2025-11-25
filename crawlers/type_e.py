@@ -136,6 +136,11 @@ class TypeECrawler(BaseCrawler):
             content_div = soup.select_one('.viewcontent')
             content = content_div.get_text('\n', strip=True) if content_div else ""
 
+        # [내용이 없는 게시글은 패스]
+        if not content:
+            print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
+            return
+
         now_str = self.format_date_str(datetime.now())
 
         self.collected_data.append({
