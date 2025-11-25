@@ -1,6 +1,8 @@
 import argparse
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from webdriver_manager.chrome import ChromeDriverManager
+
 from config import SITES
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
 from db_injector import inject_json_to_db
@@ -49,6 +51,21 @@ def main():
         sys.exit(1)
 
     site_count = len(target_sites)
+
+    # 2. 드라이버 사전 설치 (Race Condition 방지)
+    print("🔧 Chromedriver 설치 및 경로 확인 중...")
+    try:
+        # 여기서 딱 한 번만 설치하고 경로를 받아옵니다.
+        driver_path = ChromeDriverManager().install()
+        print(f"✅ Driver Path: {driver_path}")
+
+        # 모든 사이트 정보에 드라이버 경로를 주입합니다.
+        for site in target_sites:
+            site['driver_path'] = driver_path
+
+    except Exception as e:
+        print(f"❌ 드라이버 초기화 실패: {e}")
+        sys.exit(1)
 
     # === PHASE 1: 크롤링 & JSON 저장 (유동적 스레드 할당) ===
 

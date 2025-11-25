@@ -3,7 +3,7 @@ import pymysql.cursors
 
 # 1. 데이터베이스 설정
 DB_CONFIG = {
-    'host': '20.249.161.76',
+    'host': '172.16.0.4',
     'port': 13306,
     'user': 'root',
     'password': '',

@@ -20,6 +20,7 @@ class BaseCrawler:
         self.site_name = site_info['name']
         self.url = site_info['url']
         self.vendor_id = site_info.get('vendor_id', 0)
+        self.driver_path = site_info.get('driver_path')
         self.driver = None
         self.collected_data = []
         self.wait = None
@@ -33,7 +34,14 @@ class BaseCrawler:
         options.add_argument("--blink-settings=imagesEnabled=false")
         options.add_argument("--disable-dev-shm-usage")
 
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        """전달받은 경로가 있으면 그것을 사용 (충돌 방지)"""
+        if self.driver_path:
+            service = Service(executable_path=self.driver_path)
+        else:
+            """경로가 없으면(단독 테스트 등) 직접 설치 (기존 방식)"""
+            service = Service(ChromeDriverManager().install())
+
+        self.driver = webdriver.Chrome(service=service, options=options)
         self.wait = WebDriverWait(self.driver, 10)
 
     def save_to_json(self):
