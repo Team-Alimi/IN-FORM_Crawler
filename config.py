@@ -3,11 +3,11 @@ import pymysql.cursors
 
 # 1. 데이터베이스 설정
 DB_CONFIG = {
-    'host': '172.16.0.4',
-    'port': 3306,
-    'user': 'your_user',
-    'password': 'your_password',
-    'db': 'your_db_name',
+    'host': '20.249.161.76',
+    'port': 13306,
+    'user': 'root',
+    'password': '1234',
+    'db': 'informserver',
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
