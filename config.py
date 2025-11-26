@@ -14,6 +14,9 @@ DB_CONFIG = {
 
 # 2. 타겟 키워드
 KEYWORD_CATEGORIES = {
+    0: [ #EXCLUDE
+        "강의진단", "강의평가"
+    ],
     1: [ #LECTURE
         "세미나", "설명회", "멘토링", "특강", "강의", "워크숍"
     ],

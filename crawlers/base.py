@@ -112,10 +112,27 @@ class BaseCrawler:
         return date_obj.strftime("%Y-%m-%d")
 
     def match_category(self, title_text):
-        """제목 키워드 기반 카테고리 매칭"""
+        """
+        제목에서 키워드를 검사하여 카테고리 ID 반환
+        """
+        if not title_text: return None
+
+        """제외 키워드(Cat 0) 체크"""
+        exclude_keywords = KEYWORD_CATEGORIES.get(0, [])
+        for ex_kw in exclude_keywords:
+            if ex_kw in title_text:
+                return None
+
+        """포함 키워드(Cat 1, 2, 3...) 체크"""
         for cat_id, keywords in KEYWORD_CATEGORIES.items():
-            if any(kw in title_text for kw in keywords):
-                return cat_id
+            if cat_id == 0: continue  # 0번은 위에서 처리함
+
+            for kw in keywords:
+                if kw in title_text:
+                    # (디버깅용) 어떤 단어 때문에 매칭되었는지 확인하고 싶다면 주석 해제
+                    print(f"   🎯 키워드 매칭 성공: '{kw}' -> {title_text[:20]}...")
+                    return cat_id
+
         return None
 
     def wait_element(self, by, selector, timeout=10):
