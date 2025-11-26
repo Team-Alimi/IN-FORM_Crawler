@@ -35,6 +35,9 @@ class TypeACrawler(BaseCrawler):
                 title_cell = row.select_one('._artclTdTitle')
                 if not date_cell or not title_cell: continue
 
+                num_cell = row.select_one('._artclTdNum')
+                num_text = num_cell.get_text(strip=True)
+
                 date_text = date_cell.get_text(strip=True)
                 title_text = title_cell.get_text(strip=True)
 
@@ -62,7 +65,7 @@ class TypeACrawler(BaseCrawler):
                     self.js_click(link)
                     time.sleep(1)
 
-                    self._parse_detail_page(title_text, cat_id)
+                    self._parse_detail_page(title_text, cat_id, num_text)
                     collected_count += 1
 
                     self.driver.back()
@@ -85,7 +88,7 @@ class TypeACrawler(BaseCrawler):
                 print(f"✅ [{self.site_name}] 마지막 페이지 도달.")
                 break
 
-    def _parse_detail_page(self, title_text, cat_id):
+    def _parse_detail_page(self, title_text, cat_id, num_text):
         # [본문 대기]
         try:
             self.wait_element(By.CSS_SELECTOR, '.artclView', timeout=5)
@@ -100,6 +103,22 @@ class TypeACrawler(BaseCrawler):
         if not content:
             print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
             return
+
+        # [글번호 파싱]
+        article_num = num_text
+
+        # 상세 페이지 헤더 왼쪽 영역(.left)에서 글번호 탐색
+        left_area = soup.select_one('.artclViewHead .left')
+        if left_area:
+            for dl in left_area.select('dl'):
+                dt = dl.select_one('dt')
+                dd = dl.select_one('dd')
+                if dt and '글번호' in dt.get_text(strip=True):
+                    detail_num = dd.get_text(strip=True)
+                    if detail_num:
+                        article_num = detail_num
+                        break
+        unique_id = f"{self.site_code}{article_num}"
 
         # [상세 날짜 파싱]
         # 기본값: 현재 시간
@@ -129,6 +148,7 @@ class TypeACrawler(BaseCrawler):
         date_str_updated = self.format_date_str(updated_dt)
 
         self.collected_data.append({
+            'unique_id': unique_id,
             'title': title_text,
             'content': content,
             'original_url': self.driver.current_url,
@@ -137,4 +157,4 @@ class TypeACrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}...")
+        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")

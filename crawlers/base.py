@@ -18,6 +18,7 @@ class BaseCrawler:
 
     def __init__(self, site_info):
         self.site_name = site_info['name']
+        self.site_code = site_info['code']
         self.url = site_info['url']
         self.vendor_id = site_info.get('vendor_id', 0)
         self.driver_path = site_info.get('driver_path')

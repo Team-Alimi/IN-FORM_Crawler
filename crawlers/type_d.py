@@ -88,6 +88,10 @@ class TypeDCrawler(BaseCrawler):
                     cat_id = self.match_category(title_text)
                     if cat_id is None: continue
 
+                    # [글번호 임시 매칭]
+                    num_cell = row.select_one('._artclTdNum')
+                    num_text = num_cell.get_text(strip=True)
+
                     # [상세 진입]
                     try:
                         xpath = f'//tbody/tr[{i + 1}]/td[contains(@class, "subject")]//a'
@@ -95,7 +99,7 @@ class TypeDCrawler(BaseCrawler):
                         self.js_click(link)
                         time.sleep(1)
 
-                        self._parse_detail_page(title_text, date_obj, cat_id)
+                        self._parse_detail_page(title_text, date_obj, cat_id, tab_id, num_text)
                         collected_count += 1
 
                         self.driver.back()
@@ -114,7 +118,7 @@ class TypeDCrawler(BaseCrawler):
                     print("🛑 페이지 과다. 강제 종료.")
                     break
 
-    def _parse_detail_page(self, title_text, date_obj, cat_id):
+    def _parse_detail_page(self, title_text, date_obj, cat_id, tab_id, num_text):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
         content_div = soup.select_one('.contents_wrap')
@@ -125,10 +129,28 @@ class TypeDCrawler(BaseCrawler):
             print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
             return
 
+        # [글번호 파싱]
+        article_num = num_text
+
+        # 상세 페이지 헤더 왼쪽 영역(.left)에서 글번호 탐색
+        left_area = soup.select_one('.artclViewHead .left')
+        if left_area:
+            for dl in left_area.select('dl'):
+                dt = dl.select_one('dt')
+                dd = dl.select_one('dd')
+                if dt and '글번호' in dt.get_text(strip=True):
+                    detail_num = dd.get_text(strip=True)
+                    if detail_num:
+                        article_num = detail_num
+                        break
+
+        unique_id = f"{self.site_code}{tab_id}{article_num}"
+
         if date_obj is None: date_obj = datetime.now()
         date_str = self.format_date_str(date_obj)
 
         self.collected_data.append({
+            'unique_id': unique_id,
             'title': title_text,
             'content': content,
             'original_url': self.driver.current_url,

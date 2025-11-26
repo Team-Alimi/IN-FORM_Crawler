@@ -21,9 +21,9 @@ class TypeCCrawler(BaseCrawler):
             pass
 
         target_tabs = [
-            {'id': 'tab4', 'name': '특강'},
-            {'id': 'tab5', 'name': '모집'},
-            {'id': 'tab6', 'name': '기타'}
+            {'id': '4', 'name': '특강'},
+            {'id': '5', 'name': '모집'},
+            {'id': '6', 'name': '기타'}
         ]
 
         for tab in target_tabs:
@@ -31,11 +31,11 @@ class TypeCCrawler(BaseCrawler):
             try:
                 self.js_click(self.wait_element(By.ID, tab['id']))
                 time.sleep(3)
-                self._crawl_current_tab_list(tab['name'])
+                self._crawl_current_tab_list(tab['name'], tab['id'])
             except Exception as e:
                 print(f"❌ 탭 이동 실패: {e}")
 
-    def _crawl_current_tab_list(self, tab_name):
+    def _crawl_current_tab_list(self, tab_name, tab_id):
         limit_date = self.get_limit_date()
         page = 1
 
@@ -77,6 +77,10 @@ class TypeCCrawler(BaseCrawler):
                 cat_id = self.match_category(title_text)
                 if cat_id is None: continue
 
+                # [글번호 임시 매칭]
+                num_cell = row.select_one('._artclTdNum')
+                num_text = num_cell.get_text(strip=True)
+
                 # [상세 진입]
                 try:
                     xpath = f'//table[@id="tablelist"]/tbody/tr[{i + 1}]/td[contains(@class, "text-left")]/a[1]'
@@ -84,7 +88,7 @@ class TypeCCrawler(BaseCrawler):
                     self.js_click(link)
                     time.sleep(1)
 
-                    self._parse_detail_page(title_text, date_obj, cat_id)
+                    self._parse_detail_page(title_text, date_obj, cat_id, tab_id, num_text)
                     collected_count += 1
 
                     self.driver.back()
@@ -108,7 +112,7 @@ class TypeCCrawler(BaseCrawler):
                 print(f"✅ [{self.site_name}] 탭 완료.")
                 break
 
-    def _parse_detail_page(self, title_text, date_obj, cat_id):
+    def _parse_detail_page(self, title_text, date_obj, cat_id, tab_id, num_text):
         # [본문 대기]
         try:
             self.wait_element(By.ID, "IContents_divView", timeout=5)
@@ -131,10 +135,28 @@ class TypeCCrawler(BaseCrawler):
             print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
             return
 
+        # [글번호 파싱]
+        article_num = num_text
+
+        # 상세 페이지 헤더 왼쪽 영역(.left)에서 글번호 탐색
+        left_area = soup.select_one('.artclViewHead .left')
+        if left_area:
+            for dl in left_area.select('dl'):
+                dt = dl.select_one('dt')
+                dd = dl.select_one('dd')
+                if dt and '글번호' in dt.get_text(strip=True):
+                    detail_num = dd.get_text(strip=True)
+                    if detail_num:
+                        article_num = detail_num
+                        break
+
+        unique_id = f"{self.site_code}{tab_id}{article_num}"
+
         if date_obj is None: date_obj = datetime.now()
         date_str = self.format_date_str(date_obj)
 
         self.collected_data.append({
+            'unique_id': unique_id,
             'title': title_text,
             'content': content,
             'original_url': self.driver.current_url,

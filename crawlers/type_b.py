@@ -53,7 +53,7 @@ class TypeBCrawler(BaseCrawler):
                 else:
                     if not is_pinned: old_streak = 0
 
-                    # [키워드 매칭]
+                # [키워드 매칭]
                 cat_id = self.match_category(title_text)
                 if cat_id is None: continue
 
