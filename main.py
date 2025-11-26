@@ -8,17 +8,8 @@ from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, Typ
 from db_injector import inject_json_to_db
 
 
+
 def get_crawler(site_info):
-    """설정의 type에 따라 적절한 클래스 매핑"""
-    if site_info['type'] == 'A':
-        return TypeACrawler(site_info)
-    elif site_info['type'] == 'B':
-        return TypeBCrawler(site_info)
-    return None
-
-
-def run_single_site(site_info):
-    crawler = get_crawler(site_info)
 
     if site_info['type'] == 'A':
         crawler = TypeACrawler(site_info)
@@ -31,6 +22,7 @@ def run_single_site(site_info):
     elif site_info['type'] == 'E':
         crawler = TypeECrawler(site_info)
     else:
+        print(f"⚠️ 알 수 없는 사이트 타입입니다: {site_info['type']} ({site_info['name']})")
         return
 
     crawler.run()  # run()이 끝나면 JSON 파일이 생성됨
@@ -91,7 +83,7 @@ def main():
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받습니다.
-        future_to_site = {executor.submit(run_single_site, site): site for site in target_sites}
+        future_to_site = {executor.submit(get_crawler, site): site for site in target_sites}
 
         # 2. 작업이 끝나는 대로 결과를 확인합니다.
         for future in as_completed(future_to_site):
