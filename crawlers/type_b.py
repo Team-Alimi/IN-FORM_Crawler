@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
@@ -27,6 +28,16 @@ class TypeBCrawler(BaseCrawler):
                 break
 
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+
+            # [전체 게시글 수 파싱]
+            total_cnt = 0
+            total_elem = soup.select_one('.total-page')
+            if total_elem:
+                # 숫자만 추출 (regex)
+                match = re.search(r'\d+', total_elem.get_text(strip=True))
+                if match:
+                    total_cnt = int(match.group())
+
             rows = soup.select('tbody tr')
             collected_count = 0
 
@@ -37,6 +48,10 @@ class TypeBCrawler(BaseCrawler):
                 is_pinned = bool(row.select_one('.label') and "공지" in row.select_one('.label').get_text())
                 title_text = cols[1].get_text(strip=True)
                 date_text = cols[3].get_text(strip=True)
+
+                # [글번호 계산 (전체 게시글 수 - 페이지 - 인덱스)]
+                article_num = total_cnt - page - i
+                unique_id = f"{self.site_code}{article_num}"
 
                 # [날짜 파싱]
                 date_obj = self.parse_date_raw(date_text)
@@ -63,7 +78,7 @@ class TypeBCrawler(BaseCrawler):
                     self.js_click(link)
                     time.sleep(1)
 
-                    self._parse_detail_page(title_text, date_obj, cat_id)
+                    self._parse_detail_page(title_text, date_obj, cat_id, unique_id)
                     collected_count += 1
 
                     self.driver.back()
@@ -82,7 +97,7 @@ class TypeBCrawler(BaseCrawler):
                 print("🛑 너무 많은 페이지 검색. 강제 종료.")
                 break
 
-    def _parse_detail_page(self, title_text, date_obj, cat_id):
+    def _parse_detail_page(self, title_text, date_obj, cat_id, unique_id):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         content = soup.select_one('.board-view-cnt').get_text('\n', strip=True) if soup.select_one(
             '.board-view-cnt') else ""
@@ -96,6 +111,7 @@ class TypeBCrawler(BaseCrawler):
         date_str = self.format_date_str(date_obj)
 
         self.collected_data.append({
+            'unique_id': unique_id,
             'title': title_text,
             'content': content,
             'original_url': self.driver.current_url,
@@ -104,4 +120,4 @@ class TypeBCrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}...")
+        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")

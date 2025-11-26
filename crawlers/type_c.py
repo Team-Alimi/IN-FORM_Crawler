@@ -165,4 +165,4 @@ class TypeCCrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}...")
+        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")

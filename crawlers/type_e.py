@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -36,6 +37,15 @@ class TypeECrawler(BaseCrawler):
 
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
+                # [전체 게시글 수 파싱]
+                total_cnt = 0
+                total_elem = soup.select_one('#pcTit span')
+                if total_elem:
+                    # 숫자만 추출 (regex)
+                    match = re.search(r'\d+', total_elem.get_text(strip=True))
+                    if match:
+                        total_cnt = int(match.group())
+
                 # [종료 조건]
                 empty_msg = soup.select_one('span.align-center')
                 if empty_msg and "내 프로그램이 없습니다" in empty_msg.get_text():
@@ -61,6 +71,10 @@ class TypeECrawler(BaseCrawler):
                 collected_count = 0
 
                 for i, item in enumerate(items):
+                    # [글번호 계산 (전체 게시글 수 - 인덱스)]
+                    article_num = total_cnt - ((page - 1) * 10) - i
+                    unique_id = f"{self.site_code}{tab_id}{article_num}"
+
                     # [마감 체크]
                     status_span = item.select_one('span[name="finishDate"]')
                     if status_span and "마감" in status_span.get_text():
@@ -105,7 +119,7 @@ class TypeECrawler(BaseCrawler):
                         self.driver.switch_to.window(new_window)
                         time.sleep(1.5)
 
-                        self._parse_detail_page(title_text, start_str, due_str, cat_id)
+                        self._parse_detail_page(title_text, start_str, due_str, cat_id, unique_id)
                         collected_count += 1
 
                         self.driver.close()
@@ -126,7 +140,7 @@ class TypeECrawler(BaseCrawler):
                 page += 1
                 if page > 500: break
 
-    def _parse_detail_page(self, title_text, start_str, due_str, cat_id):
+    def _parse_detail_page(self, title_text, start_str, due_str, cat_id, unique_id):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
         content_span = soup.select_one('.viewcontent span.Info')
@@ -144,6 +158,7 @@ class TypeECrawler(BaseCrawler):
         now_str = self.format_date_str(datetime.now())
 
         self.collected_data.append({
+            'unique_id': unique_id,
             'title': title_text,
             'content': content,
             'original_url': self.driver.current_url,
@@ -154,4 +169,4 @@ class TypeECrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}...")
+        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")
