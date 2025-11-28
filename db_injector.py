@@ -2,10 +2,10 @@ import os
 import json
 import pymysql
 import builtins
-from config import DB_CONFIG, DATA_DIR
+from config import DB_CONFIG, QUEUE_DIR
 
 
-def inject_json_to_db(target_sites):
+def inject_json_to_db():
     """
     지정된 사이트들의 JSON 파일을 읽어서 DB에 Bulk Insert 수행
     target_sites: main.py에서 넘겨준 사이트 정보 리스트
@@ -15,51 +15,53 @@ def inject_json_to_db(target_sites):
 
     try:
         with conn.cursor() as cursor:
-            for site in target_sites:
-                file_path = os.path.join(DATA_DIR, f"{site['name']}.json")
+            # 2. 통합 INSERT 처리
+            insert_path = os.path.join(QUEUE_DIR, "INSERT_DATA.json")
+            if os.path.exists(insert_path):
+                print(f"📥 통합 데이터(INSERT) 업로드 시작...")
+                with open(insert_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
-                # 파일이 없으면 스킵 (수집된 게 없거나 에러난 경우)
-                if not os.path.exists(file_path):
-                    continue
+                if data:
+                    # 3. Bulk Insert 쿼리 준비
+                    sql = """
+                          INSERT INTO school_articles
+                              (title, content, original_url, created_at, updated_at, vendor_id, category_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                          ON DUPLICATE KEY UPDATE 
+                              title = VALUES(title),
+                              content = VALUES(content),
+                              updated_at = VALUES(updated_at),
+                              category_id = VALUES(category_id);
+                          """
+                    # 딕셔너리 리스트를 튜플 리스트로 변환
+                    values = [
+                        (
+                            item['title'], item['content'], item['original_url'],
+                            item['created_at'], item['updated_at'], item['vendor_id'], item['category_id']
+                        )
+                        for item in data
+                    ]
 
-                builtins.print(f"📥 [{site['name']}] DB 업로드 시작...")
+                    cursor.executemany(sql, values)
+                    conn.commit()
+                    print(f"   ✅ {len(values)}건 Insert 완료.")
 
-                # 2. JSON 파일 읽기
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    articles = json.load(f)
+                    # 처리 후 파일 삭제 (옵션)
+                    os.remove(insert_path)
 
-                if not articles:
-                    continue
+            # 3. 통합 UPDATE 처리
+            update_path = os.path.join(QUEUE_DIR, "UPDATE_DATA.json")
+            if os.path.exists(update_path):
+                print(f"🔄 통합 데이터(UPDATE) 처리 시작...")
+                with open(update_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
-                # 3. Bulk Insert 쿼리 준비
-                sql = """
-                      INSERT INTO school_articles
-                          (title, content, original_url, created_at, updated_at, vendor_id, category_id)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s) 
-                      ON DUPLICATE KEY UPDATE 
-                          title = VALUES(title),
-                          content = VALUES(content),
-                          updated_at = VALUES(updated_at),
-                          category_id = VALUES(category_id);
-                      """
+                if data:
+                    print(f"   ℹ️ {len(data)}건의 데이터가 업데이트 대기 중입니다.")
+                    # 개발 보류
 
-                # 딕셔너리 리스트를 튜플 리스트로 변환
-                values = [
-                    (
-                        a['title'], a['content'], a['original_url'],
-                        a['created_at'], a['updated_at'], a['vendor_id'],a['category_id']
-                    )
-                    for a in articles
-                ]
-
-                # 4. 실행 (executemany로 한방에 넣기)
-                cursor.executemany(sql, values)
-                conn.commit()
-
-                builtins.print(f"✅ [{site['name']}] {len(values)}건 업로드 완료.")
-
-                # (선택사항) 처리된 파일 삭제 or 백업 폴더로 이동
-                # os.remove(file_path)
+                    os.remove(update_path)
 
     except Exception as e:
         builtins.print(f"❌ DB 업로드 중 치명적 오류: {e}")

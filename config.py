@@ -328,8 +328,13 @@ SITES = [
 
 # 4. 크롤링 결과 JSON으로 저장
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'crawled_data')
+DATA_ROOT = os.path.join(BASE_DIR, 'crawler', 'data')
+
+HISTORY_DIR = os.path.join(DATA_ROOT, 'history')
+QUEUE_DIR = os.path.join(DATA_ROOT, 'queue')
 
 # 폴더가 없으면 미리 생성
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+for d in [HISTORY_DIR, QUEUE_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
+        print(f"📁 폴더 생성 완료: {d}")

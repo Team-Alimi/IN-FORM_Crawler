@@ -11,7 +11,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-from config import DATA_DIR, KEYWORD_CATEGORIES
+from config import DATA_ROOT, HISTORY_DIR, KEYWORD_CATEGORIES
+from dataprepper.deduplicate import Deduplicator
 
 
 class BaseCrawler:
@@ -45,46 +46,67 @@ class BaseCrawler:
         self.driver = webdriver.Chrome(service=service, options=options)
         self.wait = WebDriverWait(self.driver, 10)
 
-    def save_to_json(self):
-        """수집 데이터를 JSON 파일로 저장"""
-        if not self.collected_data:
-            print(f"⚠️ [{self.site_name}] 수집된 데이터가 없어 파일을 생성하지 않습니다.")
-            return
-
-        file_path = os.path.join(DATA_DIR, f"{self.site_name}.json")
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.collected_data, f, ensure_ascii=False, indent=4)
-            print(f"💾 [{self.site_name}] JSON 저장 완료 ({len(self.collected_data)}건) -> {file_path}")
-        except Exception as e:
-            print(f"❌ [{self.site_name}] JSON 저장 실패: {e}")
+    # def save_to_json(self):
+    #     """수집 데이터를 JSON 파일로 저장"""
+    #     if not self.collected_data:
+    #         print(f"⚠️ [{self.site_name}] 수집된 데이터가 없어 파일을 생성하지 않습니다.")
+    #         return
+    #
+    #     file_path = os.path.join(DATA_DIR, f"{self.site_code}.json")
+    #     try:
+    #         with open(file_path, 'w', encoding='utf-8') as f:
+    #             json.dump(self.collected_data, f, ensure_ascii=False, indent=4)
+    #         print(f"💾 [{self.site_name}] JSON 저장 완료 ({len(self.collected_data)}건) -> {file_path}")
+    #     except Exception as e:
+    #         print(f"❌ [{self.site_name}] JSON 저장 실패: {e}")
 
     def run(self):
-        """크롤러 실행 메인 흐름"""
+        """
+        크롤링 및 중복 제거 후 결과 리스트 반환
+        """
+        inserts = []
+        updates = []
+
         try:
             self._init_driver()
             self.crawl()
+
+            if self.collected_data:
+                # 중복 제거 수행 후 결과 받기
+                inserts, updates = self.process_data()
+            else:
+                print(f"⚠️ [{self.site_name}] 수집된 데이터가 없습니다.")
+
         except NotImplementedError:
             print(f"🔥 [{self.site_name}] 개발자 오류: crawl 메서드 미구현")
         except Exception as e:
             print(f"🔥 [{self.site_name}] 상세 에러 리포트:\n{traceback.format_exc()}")
         finally:
-            self.save_to_json()
             if self.driver:
                 try:
                     self.driver.quit()
                 except:
                     pass
 
+        # 메인 프로세스로 결과 반환
+        return inserts, updates
+
+    def process_data(self):
+        print(f"⚙️ [{self.site_name}] 데이터 분류(Deduplication) 중...")
+        deduper = Deduplicator(self.site_name)
+        return deduper.process_batch(self.collected_data)
+
     def crawl(self):
         raise NotImplementedError
 
+
     # ================= [공통 유틸리티] =================
 
+
     def get_limit_date(self):
-        """2개월 전 1일 날짜 반환 (시간 00:00:00)"""
+        """n개월 전 1일 날짜 반환 (시간 00:00:00)"""
         now = datetime.now()
-        limit = now - relativedelta(months=2)
+        limit = now - relativedelta(months=2) # 크롤링 대상 시점 범위 지정(기본값: 2달)
         return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     def parse_date_raw(self, date_text):

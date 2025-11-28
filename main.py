@@ -1,9 +1,11 @@
 import argparse
 import sys
+import os
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from webdriver_manager.chrome import ChromeDriverManager
 
-from config import SITES
+from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
 from db_injector import inject_json_to_db
 
@@ -23,9 +25,9 @@ def get_crawler(site_info):
         crawler = TypeECrawler(site_info)
     else:
         print(f"⚠️ 알 수 없는 사이트 타입입니다: {site_info['type']} ({site_info['name']})")
-        return
+        return [], []
 
-    crawler.run()  # run()이 끝나면 JSON 파일이 생성됨
+    return crawler.run()  # run()이 끝나면 tuple 생성됨
 
 
 def main():
@@ -81,26 +83,49 @@ def main():
     # 스레드 풀 실행
     print(f"Waiting for {site_count} tasks to complete...")
 
+    # 전체 데이터를 모을 리스트
+    all_inserts = []
+    all_updates = []
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받습니다.
+        # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받음
         future_to_site = {executor.submit(get_crawler, site): site for site in target_sites}
 
-        # 2. 작업이 끝나는 대로 결과를 확인합니다.
         for future in as_completed(future_to_site):
             site = future_to_site[future]
             try:
-                future.result()  # 여기서 스레드 내부 에러가 있으면 재발생(Raise) 시킴
+                # 스레드로부터 결과(리스트)를 받아옴
+                result = future.result()
+
+                if result:
+                    inserts, updates = result
+                    all_inserts.extend(inserts)
+                    all_updates.extend(updates)
+                    print(f"   ✅ [{site['name']}] 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
+
             except Exception as e:
-                # 스레드가 숨기고 있던 에러를 메인 화면에 강제로 출력
-                print(f"🔥 [{site['name']}] 실행 중 치명적 오류 발생: {e}")
+                print(f"🔥 [{site['name']}] 실행 중 오류: {e}")
 
-    print(f"✅ [Phase 1] 크롤링 및 JSON 저장 완료.")
+    print(f"✨ [Phase 1] 크롤링 완료. 데이터 통합 저장 중...")
 
-    # ## === PHASE 2: DB Bulk Insert ===
-    # print(f"🚀 [Phase 2] JSON -> DB 일괄 업로드 시작")
-    # inject_json_to_db(target_sites)
-    #
-    # print(f"🎉 모든 작업 종료.")
+    # 5. 통합 파일 저장 (JSON 생성)
+    if all_inserts:
+        path = os.path.join(QUEUE_DIR, "INSERT_DATA.json")
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(all_inserts, f, ensure_ascii=False, indent=4)
+        print(f"   💾 [Queue] 통합 INSERT 파일 생성 완료: {path} ({len(all_inserts)}건)")
+
+    if all_updates:
+        path = os.path.join(QUEUE_DIR, "UPDATE_DATA.json")
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(all_updates, f, ensure_ascii=False, indent=4)
+        print(f"   💾 [Queue] 통합 UPDATE 파일 생성 완료: {path} ({len(all_updates)}건)")
+
+        # === PHASE 2: DB Bulk Insert ===
+        print(f"🚀 [Phase 2] DB 업로드 시작")
+        inject_json_to_db()  # 인자 불필요
+
+        print(f"🎉 모든 작업 종료.")
 
 
 if __name__ == "__main__":

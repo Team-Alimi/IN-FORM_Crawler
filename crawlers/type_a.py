@@ -89,7 +89,7 @@ class TypeACrawler(BaseCrawler):
                 break
 
     def _parse_detail_page(self, title_text, cat_id, num_text):
-        # [본문 대기]
+        # [본문 파싱]
         try:
             self.wait_element(By.CSS_SELECTOR, '.artclView', timeout=5)
         except:
