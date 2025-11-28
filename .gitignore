@@ -1,0 +1,28 @@
+# --- IDE 설정 (Pycharm, VS Code) ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Python 캐시 (필수) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- 환경변수 및 보안 (중요) ---
+.env
+secrets.json
+
+# --- 로그 및 데이터 ---
+logs/
+*.log
+crawled_data/
+data/
+
+# --- 가상환경 ---
+venv/
+env/
+
+# --- OS 파일 ---
+.DS_Store
+Thumbs.db
