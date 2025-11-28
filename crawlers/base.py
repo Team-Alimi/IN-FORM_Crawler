@@ -1,5 +1,3 @@
-import json
-import os
 import traceback
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -126,20 +124,31 @@ class BaseCrawler:
         """
         if not title_text: return None
 
+        # 제목을 소문자로 변환해둠
+        title_lower = title_text.lower()
+
         """제외 키워드(Cat 0) 체크"""
         exclude_keywords = KEYWORD_CATEGORIES.get(0, [])
         for ex_kw in exclude_keywords:
-            if ex_kw in title_text:
+            # 빈 키워드 방어 (실수로 KEYWORD_CATEGORIES에 ""가 들어갔을 때 전체 스킵 방지)
+            if not ex_kw or not ex_kw.strip():
+                continue
+
+            # 키워드도 소문자로 변환하여, 소문자 제목(title_lower)과 비교
+            if ex_kw.lower() in title_lower:
                 return None
 
         """포함 키워드(Cat 1, 2, 3...) 체크"""
         for cat_id, keywords in KEYWORD_CATEGORIES.items():
-            if cat_id == 0: continue  # 0번은 위에서 처리함
+            if cat_id == 0: continue
 
             for kw in keywords:
-                if kw in title_text:
-                    # (디버깅용) 어떤 단어 때문에 매칭되었는지 확인하고 싶다면 주석 해제
-                    print(f"   🎯 키워드 매칭 성공: '{kw}' -> {title_text[:20]}...")
+                # 빈 키워드 방어
+                if not kw or not kw.strip():
+                    continue
+
+                if kw.lower() in title_lower:
+                    print(f"   🎯 키워드 매칭 성공: '{kw}' -> {title_text[:20]}...") # (디버깅용) 불필요 시 주석 처리
                     return cat_id
 
         return None

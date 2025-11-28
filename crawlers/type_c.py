@@ -1,4 +1,5 @@
 import time
+import re
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
@@ -21,9 +22,9 @@ class TypeCCrawler(BaseCrawler):
             pass
 
         target_tabs = [
-            {'id': '4', 'name': '특강'},
-            {'id': '5', 'name': '모집'},
-            {'id': '6', 'name': '기타'}
+            {'id': 'tab4', 'name': '특강'},
+            {'id': 'tab5', 'name': '모집'},
+            {'id': 'tab6', 'name': '기타'}
         ]
 
         for tab in target_tabs:
@@ -78,7 +79,7 @@ class TypeCCrawler(BaseCrawler):
                 if cat_id is None: continue
 
                 # [글번호 임시 매칭]
-                num_cell = row.select_one('._artclTdNum')
+                num_cell = row.select_one('th')
                 num_text = num_cell.get_text(strip=True)
 
                 # [상세 진입]
@@ -150,7 +151,8 @@ class TypeCCrawler(BaseCrawler):
                         article_num = detail_num
                         break
 
-        unique_id = f"{self.site_code}{tab_id}{article_num}"
+        tab_num = re.sub(r'\D', '', str(tab_id))
+        unique_id = f"{self.site_code}{tab_num}{article_num}"
 
         if date_obj is None: date_obj = datetime.now()
         date_str = self.format_date_str(date_obj)

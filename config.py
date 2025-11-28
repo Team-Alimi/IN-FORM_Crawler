@@ -15,13 +15,13 @@ DB_CONFIG = {
 # 2. 타겟 키워드
 KEYWORD_CATEGORIES = {
     0: [ #EXCLUDE
-        "강의진단", "강의평가", "졸업인증", "예비군"
+        "강의진단", "강의평가", "졸업인증", "예비군", "점검"
     ],
     1: [ #LECTURE
-        "세미나", "설명회", "멘토링", "특강", "강의", "워크숍", "박람회"
+        "세미나", "설명회", "멘토링", "특강", "강의", "워크숍", "박람회", "GDG", "데이", "Google", "School", "Symposium", "LG", "SK", "하이닉스", "삼성", "Samsung", "AWS", "Microsoft", "Naver", "KT"
     ],
     2: [ #CONTEST
-        "공모전", "챌린지", "challenge", "프로젝트", "project", "훈련"
+        "공모전", "챌린지", "challenge", "프로젝트", "project", "훈련", "내일배움카드"
     ],
     3: [ #COMPETITION
         "경진", "대회", "해커톤", "hackerthon", "메이커톤", "makerthon", "아이디어톤", "ideathon", "콘테스트", "contest", "캠프", "camp"
