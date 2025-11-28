@@ -15,7 +15,7 @@ DB_CONFIG = {
 # 2. 타겟 키워드
 KEYWORD_CATEGORIES = {
     0: [ #EXCLUDE
-        "강의진단", "강의평가", "졸업인증", "예비군", "점검"
+        "강의진단", "강의평가", "졸업인증", "예비군", "점검", "졸업요건", "다학년프로젝트"
     ],
     1: [ #LECTURE
         "세미나", "설명회", "멘토링", "특강", "강의", "워크숍", "박람회", "GDG", "데이", "Google", "School", "Symposium", "LG", "SK", "하이닉스", "삼성", "Samsung", "AWS", "Microsoft", "Naver", "KT"
