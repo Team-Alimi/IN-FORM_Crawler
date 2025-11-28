@@ -46,20 +46,6 @@ class BaseCrawler:
         self.driver = webdriver.Chrome(service=service, options=options)
         self.wait = WebDriverWait(self.driver, 10)
 
-    # def save_to_json(self):
-    #     """수집 데이터를 JSON 파일로 저장"""
-    #     if not self.collected_data:
-    #         print(f"⚠️ [{self.site_name}] 수집된 데이터가 없어 파일을 생성하지 않습니다.")
-    #         return
-    #
-    #     file_path = os.path.join(DATA_DIR, f"{self.site_code}.json")
-    #     try:
-    #         with open(file_path, 'w', encoding='utf-8') as f:
-    #             json.dump(self.collected_data, f, ensure_ascii=False, indent=4)
-    #         print(f"💾 [{self.site_name}] JSON 저장 완료 ({len(self.collected_data)}건) -> {file_path}")
-    #     except Exception as e:
-    #         print(f"❌ [{self.site_name}] JSON 저장 실패: {e}")
-
     def run(self):
         """
         크롤링 및 중복 제거 후 결과 리스트 반환

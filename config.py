@@ -328,7 +328,7 @@ SITES = [
 
 # 4. 크롤링 결과 JSON으로 저장
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.join(BASE_DIR, 'crawler', 'data')
+DATA_ROOT = os.path.join(BASE_DIR, 'data')
 
 HISTORY_DIR = os.path.join(DATA_ROOT, 'history')
 QUEUE_DIR = os.path.join(DATA_ROOT, 'queue')

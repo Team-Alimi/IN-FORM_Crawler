@@ -29,6 +29,27 @@ def get_crawler(site_info):
 
     return crawler.run()  # run()이 끝나면 tuple 생성됨
 
+def save_or_clean(data, filename):
+
+    file_path = os.path.join(QUEUE_DIR, filename)
+
+    if data:
+        # 데이터가 있으면 저장 (덮어쓰기)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        print(f"   💾 [Queue] 생성 완료: {filename} ({len(data)}건)")
+    else:
+        # 데이터가 없는데 파일이 남아있다면 삭제
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"   🗑️ [Queue] 이전 잔여 파일 삭제 완료: {filename}")
+            except Exception as e:
+                print(f"   ⚠️ 파일 삭제 실패: {e}")
+        else:
+            # 데이터도 없고 파일도 없으면 정상
+            print(f"   ℹ️ [Queue] 생성할 데이터 없음: {filename}")
+
 
 def main():
     # 1. 실행 시 --type 인자를 필수로 받도록 설정
@@ -109,23 +130,14 @@ def main():
     print(f"✨ [Phase 1] 크롤링 완료. 데이터 통합 저장 중...")
 
     # 5. 통합 파일 저장 (JSON 생성)
-    if all_inserts:
-        path = os.path.join(QUEUE_DIR, "INSERT_DATA.json")
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(all_inserts, f, ensure_ascii=False, indent=4)
-        print(f"   💾 [Queue] 통합 INSERT 파일 생성 완료: {path} ({len(all_inserts)}건)")
+    save_or_clean(all_inserts, "INSERT_DATA.json")
+    save_or_clean(all_updates, "UPDATE_DATA.json")
 
-    if all_updates:
-        path = os.path.join(QUEUE_DIR, "UPDATE_DATA.json")
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(all_updates, f, ensure_ascii=False, indent=4)
-        print(f"   💾 [Queue] 통합 UPDATE 파일 생성 완료: {path} ({len(all_updates)}건)")
+     # === PHASE 2: DB Bulk Insert ===
+    print(f"🚀 [Phase 2] DB 업로드 시작")
+    inject_json_to_db()  # 인자 불필요
 
-        # === PHASE 2: DB Bulk Insert ===
-        print(f"🚀 [Phase 2] DB 업로드 시작")
-        inject_json_to_db()  # 인자 불필요
-
-        print(f"🎉 모든 작업 종료.")
+    print(f"🎉 모든 작업 종료.")
 
 
 if __name__ == "__main__":
