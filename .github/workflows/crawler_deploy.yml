@@ -1,0 +1,49 @@
+name: Crawler CI/CD
+
+# 트리거: 'crawler' 브랜치에 코드가 푸시되면 실행
+on:
+  push:
+    branches: [ "crawler" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest  # 깃허브의 가상 컴퓨터(Ubuntu) 사용
+
+    steps:
+    # 1. 저장소에서 코드 내려받기
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. Docker Hub 로그인 (Secrets 사용)
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # 3. 도커 이미지 빌드 및 푸시 (Build & Push)
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .              # Dockerfile이 있는 경로 (루트 기준)
+        push: true              # 빌드 후 즉시 업로드
+        tags: ${{ secrets.DOCKER_USERNAME }}/inform-crawler:latest
+        # Github Actions는 매번 새로운 환경에서 실행되므로 no-cache 옵션이 없어도 항상 깨끗하게 빌드됩니다.
+
+    # 4. Azure VM에 접속하여 배포 명령 실행 (SSH)
+    - name: Deploy to Azure VM
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST_IP }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          echo "🎉 배포 시작: Docker Hub에서 최신 이미지 당겨오기..."
+          
+          # 1. 최신 이미지 다운로드 (Pull)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/inform-crawler:latest
+          
+          # 2. 공간 절약을 위해 사용하지 않는 이미지(dangling) 정리
+          docker image prune -f
+          
+          echo "✅ 배포 완료! (Crontab이 다음 스케줄부터 이 이미지를 사용합니다)"
