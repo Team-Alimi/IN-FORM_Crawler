@@ -24,6 +24,19 @@ class BaseCrawler:
         self.driver = None
         self.collected_data = []
         self.wait = None
+        self.limit_date = self.get_limit_date()
+
+    # [리팩터링] 모든 크롤러가 공통으로 사용할 로그 출력 함수 추가
+    def log(self, message, level="INFO"):
+        icon = "📄"
+        if level == "START": icon = "🚀"
+        elif level == "SUCCESS": icon = "✅"
+        elif level == "WARN": icon = "⚠️"
+        elif level == "ERROR": icon = "🔥"
+        elif level == "STOP": icon = "🛑"
+        elif level == "COLLECT": icon = "✨"
+
+        print(f"{icon} [{self.site_name}] {message}")
 
     def _init_driver(self):
         """브라우저 드라이버 초기화 및 옵션 설정"""
@@ -34,11 +47,9 @@ class BaseCrawler:
         options.add_argument("--blink-settings=imagesEnabled=false")
         options.add_argument("--disable-dev-shm-usage")
 
-        """전달받은 경로가 있으면 그것을 사용 (충돌 방지)"""
         if self.driver_path:
             service = Service(executable_path=self.driver_path)
         else:
-            """경로가 없으면(단독 테스트 등) 직접 설치 (기존 방식)"""
             service = Service(ChromeDriverManager().install())
 
         self.driver = webdriver.Chrome(service=service, options=options)
@@ -56,15 +67,16 @@ class BaseCrawler:
             self.crawl()
 
             if self.collected_data:
-                # 중복 제거 수행 후 결과 받기
+                # [수정] 로그 함수 사용
+                self.log("데이터 분류(Deduplication) 중...", "INFO")
                 inserts, updates = self.process_data()
             else:
-                print(f"⚠️ [{self.site_name}] 수집된 데이터가 없습니다.")
+                self.log("수집된 데이터가 없습니다.", "WARN")
 
         except NotImplementedError:
-            print(f"🔥 [{self.site_name}] 개발자 오류: crawl 메서드 미구현")
+            self.log("개발자 오류: crawl 메서드 미구현", "ERROR")
         except Exception as e:
-            print(f"🔥 [{self.site_name}] 상세 에러 리포트:\n{traceback.format_exc()}")
+            self.log(f"상세 에러 리포트:\n{traceback.format_exc()}", "ERROR")
         finally:
             if self.driver:
                 try:
@@ -72,29 +84,24 @@ class BaseCrawler:
                 except:
                     pass
 
-        # 메인 프로세스로 결과 반환
         return inserts, updates
 
     def process_data(self):
-        print(f"⚙️ [{self.site_name}] 데이터 분류(Deduplication) 중...")
         deduper = Deduplicator(self.site_name)
         return deduper.process_batch(self.collected_data)
 
     def crawl(self):
         raise NotImplementedError
 
-
     # ================= [공통 유틸리티] =================
-
 
     def get_limit_date(self):
         """n개월 전 1일 날짜 반환 (시간 00:00:00)"""
         now = datetime.now()
-        limit = now - relativedelta(months=2) # 크롤링 대상 시점 범위 지정(기본값: 2달)
+        limit = now - relativedelta(months=2)
         return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     def parse_date_raw(self, date_text):
-        """다양한 날짜 문자열을 datetime 객체로 변환 (시간 정보 제거)"""
         if not date_text: return None
         date_text = date_text.strip()
 
@@ -114,58 +121,37 @@ class BaseCrawler:
         return None
 
     def format_date_str(self, date_obj):
-        """datetime 객체를 DB 저장용 'YYYY-MM-DD' 문자열로 변환"""
         if date_obj is None: return None
         return date_obj.strftime("%Y-%m-%d")
 
     def match_category(self, title_text):
-        """
-        제목에서 키워드를 검사하여 카테고리 ID 반환
-        """
         if not title_text: return None
-
-        # 제목을 소문자로 변환해둠
         title_lower = title_text.lower()
 
-        """제외 키워드(Cat 0) 체크"""
         exclude_keywords = KEYWORD_CATEGORIES.get(0, [])
         for ex_kw in exclude_keywords:
-            # 빈 키워드 방어 (실수로 KEYWORD_CATEGORIES에 ""가 들어갔을 때 전체 스킵 방지)
-            if not ex_kw or not ex_kw.strip():
-                continue
+            if not ex_kw or not ex_kw.strip(): continue
+            if ex_kw.lower() in title_lower: return None
 
-            # 키워드도 소문자로 변환하여, 소문자 제목(title_lower)과 비교
-            if ex_kw.lower() in title_lower:
-                return None
-
-        """포함 키워드(Cat 1, 2, 3...) 체크"""
         for cat_id, keywords in KEYWORD_CATEGORIES.items():
             if cat_id == 0: continue
-
             for kw in keywords:
-                # 빈 키워드 방어
-                if not kw or not kw.strip():
-                    continue
-
+                if not kw or not kw.strip(): continue
                 if kw.lower() in title_lower:
-                    print(f"   🎯 키워드 매칭 성공: '{kw}' -> {title_text[:20]}...") # (디버깅용) 불필요 시 주석 처리
+                    # self.log(f"키워드 매칭 성공: '{kw}'", "INFO") # 디버깅용
                     return cat_id
-
         return None
 
     def wait_element(self, by, selector, timeout=10):
-        """단일 요소 대기 및 반환"""
         return WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located((by, selector))
         )
 
     def wait_elements(self, by, selector, timeout=10):
-        """복수 요소 대기 및 반환"""
         return WebDriverWait(self.driver, timeout).until(
             EC.presence_of_all_elements_located((by, selector))
         )
 
     def js_click(self, element):
-        """JavaScript 강제 클릭"""
         self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
         self.driver.execute_script("arguments[0].click();", element)

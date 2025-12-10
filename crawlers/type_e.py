@@ -11,12 +11,13 @@ from .base import BaseCrawler
 class TypeECrawler(BaseCrawler):
 
     def crawl(self):
-        print(f"🚀 [{self.site_name}] Type E 크롤링 시작")
+        # [리팩터링] self.log 사용
+        self.log("Type E 크롤링 시작", "START")
 
         target_tabs = [1, 2]
 
         for tab_id in target_tabs:
-            print(f"\n📂 [{self.site_name}] Tab {tab_id} 진입...")
+            self.log(f"Tab {tab_id} 진입...")
             page = 1
             stop_tab = False
             prev_page_titles = []
@@ -25,64 +26,56 @@ class TypeECrawler(BaseCrawler):
                 separator = '&' if '?' in self.url else '?'
                 current_url = f"{self.url}{separator}prodiv={tab_id}&rp={page}"
 
-                print(f"📄 [{self.site_name}] Page {page} 스캔 중...")
+                self.log(f"Page {page} 스캔 중...")
                 self.driver.get(current_url)
 
-                # [목록 로딩]
                 try:
                     self.wait_element(By.CSS_SELECTOR, '#programZone, span.align-center', timeout=5)
                 except:
-                    print(f"✅ Tab {tab_id} 완료 (로딩 실패/끝).")
+                    self.log(f"Tab {tab_id} 완료 (로딩 실패/끝).", "SUCCESS")
                     break
 
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-                # [전체 게시글 수 파싱]
                 total_cnt = 0
                 total_elem = soup.select_one('#pcTit span')
                 if total_elem:
-                    # 숫자만 추출 (regex)
                     match = re.search(r'\d+', total_elem.get_text(strip=True))
                     if match:
                         total_cnt = int(match.group())
 
-                # [종료 조건]
                 empty_msg = soup.select_one('span.align-center')
                 if empty_msg and "내 프로그램이 없습니다" in empty_msg.get_text():
-                    print(f"✅ Tab {tab_id} 완료 (안내 문구).")
+                    self.log(f"Tab {tab_id} 완료 (안내 문구).", "SUCCESS")
                     break
 
                 items = soup.select('ul.d-flex-program-list > li')
                 if not items:
-                    print(f"✅ Tab {tab_id} 완료 (아이템 없음).")
+                    self.log(f"Tab {tab_id} 완료 (아이템 없음).", "SUCCESS")
                     break
 
-                # [중복 페이지 감지]
                 current_titles = []
                 for item in items:
                     t_div = item.select_one('div[id$="_Title_txt"]')
                     if t_div: current_titles.append(t_div.get_text(strip=True))
 
                 if current_titles and current_titles == prev_page_titles:
-                    print(f"✅ Tab {tab_id} 완료 (중복 페이지 감지).")
+                    self.log(f"Tab {tab_id} 완료 (중복 페이지 감지).", "SUCCESS")
                     break
                 prev_page_titles = current_titles
 
                 collected_count = 0
 
                 for i, item in enumerate(items):
-                    # [글번호 계산 (전체 게시글 수 - 인덱스)]
                     article_num = total_cnt - ((page - 1) * 10) - i
                     unique_id = f"{self.site_code}{tab_id}{article_num}"
 
-                    # [마감 체크]
                     status_span = item.select_one('span[name="finishDate"]')
                     if status_span and "마감" in status_span.get_text():
-                        print(f"🛑 '마감' 발견. Tab {tab_id} 종료.")
+                        self.log("'마감' 발견. Tab 종료.", "STOP")
                         stop_tab = True
                         break
 
-                    # [데이터 추출]
                     title_div = item.select_one('div[id$="_Title_txt"]')
                     if not title_div: continue
                     title_text = title_div.get_text(strip=True)
@@ -100,11 +93,9 @@ class TypeECrawler(BaseCrawler):
                             start_str = self.format_date_str(s_obj)
                             due_str = self.format_date_str(e_obj)
 
-                    # [키워드 매칭]
                     cat_id = self.match_category(title_text)
                     if cat_id is None: continue
 
-                    # [상세 진입 (팝업)]
                     try:
                         css_selector = f"#programZone ul.d-flex-program-list > li:nth-of-type({i + 1}) div[id$='_Title_txt']"
                         click_target = self.wait_element(By.CSS_SELECTOR, css_selector, timeout=5)
@@ -127,7 +118,7 @@ class TypeECrawler(BaseCrawler):
                         time.sleep(0.5)
 
                     except Exception as e:
-                        print(f"⚠️ 상세 진입 실패 ({title_text}): {e}")
+                        self.log(f"상세 진입 실패 ({title_text}): {e}", "WARN")
                         if self.driver.current_window_handle != main_window:
                             self.driver.close()
                             self.driver.switch_to.window(main_window)
@@ -135,7 +126,7 @@ class TypeECrawler(BaseCrawler):
 
                 if stop_tab: break
                 if collected_count == 0:
-                    print(f"   (ℹ️ Page {page}: 수집된 글 없음)")
+                    self.log(f"(Page {page}: 수집된 글 없음)")
 
                 page += 1
                 if page > 500: break
@@ -150,9 +141,8 @@ class TypeECrawler(BaseCrawler):
             content_div = soup.select_one('.viewcontent')
             content = content_div.get_text('\n', strip=True) if content_div else ""
 
-        # [내용이 없는 게시글은 패스]
         if not content:
-            print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
+            self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
             return
 
         now_str = self.format_date_str(datetime.now())
@@ -169,4 +159,4 @@ class TypeECrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")
+        self.log(f"Collected: {title_text[:30]}... (ID: {unique_id})", "COLLECT")

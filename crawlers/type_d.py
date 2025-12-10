@@ -8,13 +8,13 @@ from .base import BaseCrawler
 class TypeDCrawler(BaseCrawler):
 
     def crawl(self):
-        limit_date = self.get_limit_date()
-        print(f"🚀 [{self.site_name}] Type D 크롤링 시작 (Limit: {limit_date.strftime('%Y-%m-%d')})")
+        # [리팩터링] limit_date 삭제 및 self.log 사용
+        self.log(f"Type D 크롤링 시작 (Limit: {self.limit_date.strftime('%Y-%m-%d')})", "START")
 
         target_tabs = [1, 3, 4]
 
         for tab_id in target_tabs:
-            print(f"\n📂 [{self.site_name}] Tab {tab_id} 진입...")
+            self.log(f"Tab {tab_id} 진입...")
             page = 1
             old_streak = 0
             prev_page_titles = []
@@ -23,14 +23,13 @@ class TypeDCrawler(BaseCrawler):
                 separator = '&' if '?' in self.url else '?'
                 current_url = f"{self.url}{separator}cate={tab_id}&per_page={page}"
 
-                print(f"📄 [{self.site_name}] Page {page} 스캔 중... (Tab {tab_id})")
+                self.log(f"Page {page} 스캔 중... (Tab {tab_id})")
                 self.driver.get(current_url)
 
-                # [목록 로딩]
                 try:
                     self.wait_elements(By.CSS_SELECTOR, 'tbody tr')
                 except:
-                    print(f"✅ Tab {tab_id} 완료 (글 없음).")
+                    self.log(f"Tab {tab_id} 완료 (글 없음).", "SUCCESS")
                     break
 
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -39,25 +38,22 @@ class TypeDCrawler(BaseCrawler):
 
                 if not rows: break
 
-                # [종료 조건: 안내 문구]
                 empty_msg_td = soup.select_one('td.text-center')
                 if empty_msg_td and "등록된 게시글이 없습니다" in empty_msg_td.get_text():
-                    print(f"✅ Tab {tab_id} 완료 (안내 문구 감지).")
+                    self.log(f"Tab {tab_id} 완료 (안내 문구 감지).", "SUCCESS")
                     break
 
-                # [종료 조건: 중복 페이지 감지]
                 current_titles = []
                 for r in rows:
                     subj = r.select_one('td.subject span a')
                     if subj: current_titles.append(subj.get_text(strip=True))
 
                 if current_titles and current_titles == prev_page_titles:
-                    print(f"✅ Tab {tab_id} 완료 (중복 페이지 감지).")
+                    self.log(f"Tab {tab_id} 완료 (중복 페이지 감지).", "SUCCESS")
                     break
                 prev_page_titles = current_titles
 
                 for i, row in enumerate(rows):
-                    # [데이터 추출]
                     subject_td = row.select_one('td.subject')
                     date_td = row.select_one('td.regdate')
                     if not subject_td or not date_td: continue
@@ -71,28 +67,25 @@ class TypeDCrawler(BaseCrawler):
                     if not date_text and date_span.has_attr('title'):
                         date_text = date_span['title']
 
-                    # [날짜 검증]
                     date_obj = self.parse_date_raw(date_text)
                     if date_obj is None: continue
 
-                    if date_obj < limit_date:
+                    # [수정] self.limit_date
+                    if date_obj < self.limit_date:
                         old_streak += 1
                         if old_streak >= 20:
-                            print(f"🛑 [{self.site_name}] 날짜 제한 도달. 종료.")
+                            self.log("날짜 제한 도달. 종료.", "STOP")
                             break
                         continue
                     else:
                         old_streak = 0
 
-                    # [키워드 매칭]
                     cat_id = self.match_category(title_text)
                     if cat_id is None: continue
 
-                    # [글번호 임시 매칭]
                     num_cell = row.select_one('._artclTdNum')
                     num_text = num_cell.get_text(strip=True)
 
-                    # [상세 진입]
                     try:
                         xpath = f'//tbody/tr[{i + 1}]/td[contains(@class, "subject")]//a'
                         link = self.driver.find_element(By.XPATH, xpath)
@@ -105,17 +98,17 @@ class TypeDCrawler(BaseCrawler):
                         self.driver.back()
                         time.sleep(1)
                     except Exception as e:
-                        print(f"⚠️ [{self.site_name}] 상세 진입 실패: {e}")
+                        self.log(f"상세 진입 실패: {e}", "WARN")
                         self.driver.get(current_url)
                         time.sleep(2)
 
                 if old_streak >= 20: break
                 if collected_count == 0:
-                    print(f"   (ℹ️ Page {page}: 수집된 글 없음)")
+                    self.log(f"(Page {page}: 수집된 글 없음)")
 
                 page += 1
                 if page > 500:
-                    print("🛑 페이지 과다. 강제 종료.")
+                    self.log("페이지 과다. 강제 종료.", "STOP")
                     break
 
     def _parse_detail_page(self, title_text, date_obj, cat_id, tab_id, num_text):
@@ -124,15 +117,11 @@ class TypeDCrawler(BaseCrawler):
         content_div = soup.select_one('.contents_wrap')
         content = content_div.get_text('\n', strip=True) if content_div else ""
 
-        # [내용이 없는 게시글은 패스]
         if not content:
-            print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
+            self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
             return
 
-        # [글번호 파싱]
         article_num = num_text
-
-        # 상세 페이지 헤더 왼쪽 영역(.left)에서 글번호 탐색
         left_area = soup.select_one('.artclViewHead .left')
         if left_area:
             for dl in left_area.select('dl'):
@@ -159,4 +148,4 @@ class TypeDCrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")
+        self.log(f"Collected: {title_text[:30]}... (ID: {unique_id})", "COLLECT")
