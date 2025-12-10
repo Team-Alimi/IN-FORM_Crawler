@@ -24,6 +24,8 @@ class BaseCrawler:
         self.driver = None
         self.collected_data = []
         self.wait = None
+
+        # [리팩터링] 자식들이 매번 계산하지 않게 여기서 미리 계산
         self.limit_date = self.get_limit_date()
 
     # [리팩터링] 모든 크롤러가 공통으로 사용할 로그 출력 함수 추가
