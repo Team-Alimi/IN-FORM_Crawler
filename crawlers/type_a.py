@@ -8,21 +8,21 @@ from .base import BaseCrawler
 class TypeACrawler(BaseCrawler):
 
     def crawl(self):
-        limit_date = self.get_limit_date()
-        print(f"🚀 [{self.site_name}] Type A 크롤링 시작 (Limit: {limit_date.strftime('%Y-%m-%d')})")
+        # [리팩터링] limit_date 지역변수 삭제 -> self.limit_date 사용
+        # [리팩터링] print -> self.log 교체
+        self.log(f"Type A 크롤링 시작 (Limit: {self.limit_date.strftime('%Y-%m-%d')})", "START")
 
         self.driver.get(self.url)
         page = 1
         old_streak = 0
 
         while True:
-            print(f"📄 [{self.site_name}] Page {page} 스캔 중...")
+            self.log(f"Page {page} 스캔 중...")
 
-            # [목록 로딩]
             try:
                 self.wait_elements(By.CSS_SELECTOR, 'tbody tr')
             except:
-                print(f"✅ [{self.site_name}] 게시글 로딩 실패 또는 끝.")
+                self.log("게시글 로딩 실패 또는 끝.", "SUCCESS")
                 break
 
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -30,7 +30,6 @@ class TypeACrawler(BaseCrawler):
             collected_count = 0
 
             for i, row in enumerate(rows):
-                # [데이터 추출]
                 date_cell = row.select_one('._artclTdRdate')
                 title_cell = row.select_one('._artclTdTitle')
                 if not date_cell or not title_cell: continue
@@ -41,24 +40,22 @@ class TypeACrawler(BaseCrawler):
                 date_text = date_cell.get_text(strip=True)
                 title_text = title_cell.get_text(strip=True)
 
-                # [날짜 검증]
                 date_obj = self.parse_date_raw(date_text)
                 if date_obj is None: continue
 
-                if date_obj < limit_date:
+                # [수정] self.limit_date 사용
+                if date_obj < self.limit_date:
                     old_streak += 1
                     if old_streak >= 20:
-                        print(f"🛑 [{self.site_name}] 날짜 제한 도달. 종료.")
+                        self.log("날짜 제한 도달. 종료.", "STOP")
                         return
                     continue
                 else:
                     old_streak = 0
 
-                # [키워드 매칭]
                 cat_id = self.match_category(title_text)
                 if cat_id is None: continue
 
-                # [상세 진입]
                 try:
                     xpath = f'//tbody/tr[{i + 1}]/td[contains(@class, "_artclTdTitle")]/a'
                     link = self.driver.find_element(By.XPATH, xpath)
@@ -71,25 +68,23 @@ class TypeACrawler(BaseCrawler):
                     self.driver.back()
                     time.sleep(1)
                 except Exception as e:
-                    print(f"⚠️ [{self.site_name}] 상세 진입 실패: {e}")
+                    self.log(f"상세 진입 실패: {e}", "WARN")
                     self.driver.get(self.url)
                     time.sleep(2)
 
             if collected_count == 0:
-                print(f"   (ℹ️ Page {page}: 수집된 글 없음)")
+                self.log(f"(Page {page}: 수집된 글 없음)")
 
-            # [페이지네이션]
             page += 1
             try:
                 next_btn = self.wait_element(By.XPATH, f'//a[contains(@onclick, "page") and text()="{page}"]')
                 self.js_click(next_btn)
                 time.sleep(2)
             except:
-                print(f"✅ [{self.site_name}] 마지막 페이지 도달.")
+                self.log("마지막 페이지 도달.", "SUCCESS")
                 break
 
     def _parse_detail_page(self, title_text, cat_id, num_text):
-        # [본문 파싱]
         try:
             self.wait_element(By.CSS_SELECTOR, '.artclView', timeout=5)
         except:
@@ -99,15 +94,11 @@ class TypeACrawler(BaseCrawler):
         content_div = soup.select_one('.artclView')
         content = content_div.get_text('\n', strip=True) if content_div else ""
 
-        # [내용이 없는 게시글은 패스]
         if not content:
-            print(f"   ⚠️ 본문 없음 (Skip): {title_text[:30]}...")
+            self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
             return
 
-        # [글번호 파싱]
         article_num = num_text
-
-        # 상세 페이지 헤더 왼쪽 영역(.left)에서 글번호 탐색
         left_area = soup.select_one('.artclViewHead .left')
         if left_area:
             for dl in left_area.select('dl'):
@@ -120,22 +111,17 @@ class TypeACrawler(BaseCrawler):
                         break
         unique_id = f"{self.site_code}{article_num}"
 
-        # [상세 날짜 파싱]
-        # 기본값: 현재 시간
         created_dt = datetime.now()
         updated_dt = created_dt
 
-        # 상세 페이지 헤더에서 정확한 작성일/수정일 추출 시도
         dls = soup.select('.artclViewHead dl')
         for dl in dls:
             dt_elem = dl.select_one('dt')
             dd_elem = dl.select_one('dd')
-
             if not dt_elem or not dd_elem: continue
 
             label = dt_elem.get_text(strip=True)
             val = dd_elem.get_text(strip=True)
-
             date_obj = self.parse_date_raw(val)
             if date_obj:
                 if '작성일' in label:
@@ -143,7 +129,6 @@ class TypeACrawler(BaseCrawler):
                 elif '수정일' in label:
                     updated_dt = date_obj
 
-        # DB 저장용 문자열 변환
         date_str_created = self.format_date_str(created_dt)
         date_str_updated = self.format_date_str(updated_dt)
 
@@ -157,4 +142,4 @@ class TypeACrawler(BaseCrawler):
             'vendor_id': self.vendor_id,
             'category_id': cat_id
         })
-        print(f"   ✨ Collected: {title_text[:30]}... (ID: {unique_id})")
+        self.log(f"Collected: {title_text[:30]}... (ID: {unique_id})", "COLLECT")
