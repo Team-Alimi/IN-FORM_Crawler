@@ -40,11 +40,12 @@ jobs:
         script: |
           echo "[1/3] 최신 환경변수 파일(.env) 생성 중..."
           
+          rm -f /home/Alimi/crawler/.env 
           echo "DB_HOST=${{ secrets.DB_HOST }}" > /home/Alimi/crawler/.env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> /home/Alimi/crawler/.env
           echo "DB_USER=root" >> /home/Alimi/crawler/.env
           echo "DB_NAME=informserver" >> /home/Alimi/crawler/.env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> /home/Alimi/crawler/.env
+          echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> /home/Alimi/crawler/.env
           
           chmod 600 /home/Alimi/crawler/.env
           
