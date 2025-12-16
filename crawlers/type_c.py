@@ -116,14 +116,20 @@ class TypeCCrawler(BaseCrawler):
 
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
+        # [수정] 여러 선택지 중 하나를 찾은 뒤 unwrap 적용
         content_div = soup.select_one('#IContents_div내용')
-        if not content_div: content_div = soup.select_one('.board-view-cont')
+        if not content_div:
+            content_div = soup.select_one('.board-view-cont')
+        if not content_div:
+            content_div = soup.select_one('#IContents_divView')
+
+        content = ""
 
         if content_div:
+            # 스타일 태그 벗겨내기
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+                tag.unwrap()
             content = content_div.get_text('\n', strip=True)
-        else:
-            wrapper = soup.select_one('#IContents_divView')
-            content = wrapper.get_text('\n', strip=True) if wrapper else ""
 
         if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")

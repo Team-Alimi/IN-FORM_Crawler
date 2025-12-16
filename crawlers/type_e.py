@@ -134,12 +134,17 @@ class TypeECrawler(BaseCrawler):
     def _parse_detail_page(self, title_text, start_str, due_str, cat_id, unique_id):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-        content_span = soup.select_one('.viewcontent span.Info')
-        if content_span:
-            content = content_span.get_text('\n', strip=True)
-        else:
+        # [수정] 선택 로직 후 unwrap 적용
+        content_div = soup.select_one('.viewcontent span.Info')
+        if not content_div:
             content_div = soup.select_one('.viewcontent')
-            content = content_div.get_text('\n', strip=True) if content_div else ""
+
+        content = ""
+        if content_div:
+            # 스타일 태그 벗겨내기
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+                tag.unwrap()
+            content = content_div.get_text('\n', strip=True)
 
         if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")

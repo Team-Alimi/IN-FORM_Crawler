@@ -114,8 +114,15 @@ class TypeDCrawler(BaseCrawler):
     def _parse_detail_page(self, title_text, date_obj, cat_id, tab_id, num_text):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
+        # [수정] unwrap 로직 적용
         content_div = soup.select_one('.contents_wrap')
-        content = content_div.get_text('\n', strip=True) if content_div else ""
+        content = ""
+
+        if content_div:
+            # 스타일 태그 벗겨내기
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+                tag.unwrap()
+            content = content_div.get_text('\n', strip=True)
 
         if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")

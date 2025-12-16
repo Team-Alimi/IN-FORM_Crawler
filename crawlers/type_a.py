@@ -92,9 +92,19 @@ class TypeACrawler(BaseCrawler):
 
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
         content_div = soup.select_one('.artclView')
-        content = content_div.get_text('\n', strip=True) if content_div else ""
+        content = ""
+        if content_div:
+            # [핵심] span 태그가 있으면 껍데기만 벗기고 텍스트는 남김
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+                tag.unwrap()
 
-        if not content:
+            # [핵심] strong, b, em 태그도 필요하다면 벗겨도 됨 (선택사항)
+            # for tag in content_div.find_all(['strong', 'b', 'em', 'font']):
+            #    tag.unwrap()
+
+            # 이제 줄바꿈으로 가져오면 문장은 이어지고, 진짜 문단만 줄바꿈됨
+            content = content_div.get_text('\n', strip=True)
+        else:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
             return
 

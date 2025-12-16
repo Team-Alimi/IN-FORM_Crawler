@@ -29,10 +29,8 @@ def inject_json_to_db():
                               (title, content, original_url, created_at, updated_at, vendor_id, category_id)
                           VALUES (%s, %s, %s, %s, %s, %s, %s) 
                           ON DUPLICATE KEY UPDATE 
-                              title = VALUES(title),
-                              content = VALUES(content),
-                              updated_at = VALUES(updated_at),
-                              category_id = VALUES(category_id);
+                              content = VALUES(content);
+                              
                           """
                     # 딕셔너리 리스트를 튜플 리스트로 변환
                     values = [
