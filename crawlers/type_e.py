@@ -141,10 +141,25 @@ class TypeECrawler(BaseCrawler):
 
         content = ""
         if content_div:
-            # 스타일 태그 벗겨내기
-            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+            # [1] <br> -> \n
+            for br in content_div.find_all('br'):
+                br.replace_with('\n')
+
+            # [2] 블록 태그 뒤에 \n 추가
+            for block in content_div.find_all(['p', 'div', 'li', 'tr']):
+                block.append('\n')
+
+            # [3] 인라인 태그 unwrap
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font', 'a', 'label']):
                 tag.unwrap()
-            content = content_div.get_text('\n', strip=True)
+
+            # [4] 텍스트 추출 (구분자: 공백)
+            content = content_div.get_text(' ', strip=True)
+
+            # [5] 정규식 정리
+            import re
+            content = re.sub(r'[ \t]*\n[ \t]*', '\n', content)
+            content = re.sub(r'\n{3,}', '\n\n', content)
 
         if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
