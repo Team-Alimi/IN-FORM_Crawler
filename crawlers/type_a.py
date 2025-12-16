@@ -94,17 +94,31 @@ class TypeACrawler(BaseCrawler):
         content_div = soup.select_one('.artclView')
         content = ""
         if content_div:
-            # [핵심] span 태그가 있으면 껍데기만 벗기고 텍스트는 남김
-            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+            # [1] <br> 태그를 실제 줄바꿈 문자로 변경
+            for br in content_div.find_all('br'):
+                br.replace_with('\n')
+
+            # [2] 문단(p, div, li)이 끝날 때 줄바꿈 문자 추가 (문단 구분용)
+            for block in content_div.find_all(['p', 'div', 'li', 'tr']):
+                block.append('\n')
+
+            # [3] 문장을 끊어먹는 인라인 태그들 껍질 벗기기 (Unwrap)
+            # a 태그나 label 태그 등도 포함하여 텍스트만 남김
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font', 'a', 'label']):
                 tag.unwrap()
 
-            # [핵심] strong, b, em 태그도 필요하다면 벗겨도 됨 (선택사항)
-            # for tag in content_div.find_all(['strong', 'b', 'em', 'font']):
-            #    tag.unwrap()
+            # [4] 텍스트 추출 (중요: 구분자를 ' '(공백)으로 설정)
+            # 이렇게 하면 unwrap된 단어들이 줄바꿈되지 않고 자연스럽게 이어집니다.
+            content = content_div.get_text(' ', strip=True)
 
-            # 이제 줄바꿈으로 가져오면 문장은 이어지고, 진짜 문단만 줄바꿈됨
-            content = content_div.get_text('\n', strip=True)
-        else:
+            # [5] 후처리: 기계적으로 들어간 줄바꿈 정리
+            import re
+            # 공백+줄바꿈 -> 줄바꿈
+            content = re.sub(r'[ \t]*\n[ \t]*', '\n', content)
+            # 3개 이상의 연속 줄바꿈 -> 2개로 줄임
+            content = re.sub(r'\n{3,}', '\n\n', content)
+
+        if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
             return
 

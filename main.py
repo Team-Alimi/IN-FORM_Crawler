@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import argparse
 import sys
 import os
@@ -9,8 +8,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
 from dataprepper.classifier import AIClassifier
+from dataprepper.deduplicate import Deduplicator
 from db_injector import inject_json_to_db
-
 
 
 def get_crawler(site_info):
@@ -26,45 +25,36 @@ def get_crawler(site_info):
     elif site_info['type'] == 'E':
         crawler = TypeECrawler(site_info)
     else:
-        print(f"⚠️ 알 수 없는 사이트 타입입니다: {site_info['type']} ({site_info['name']})")
-        return [], []
+        print(f"⚠️ 알 수 없는 사이트 타입: {site_info['type']}")
+        return site_info['name'], []
 
-    return crawler.run()  # run()이 끝나면 tuple 생성됨
+    return crawler.run()
+
 
 def save_or_clean(data, filename):
-
     file_path = os.path.join(QUEUE_DIR, filename)
-
     if data:
-        # 데이터가 있으면 저장 (덮어쓰기)
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        print(f"   💾 [Queue] 생성 완료: {filename} ({len(data)}건)")
+        print(f"   💾 [Queue] 저장 완료: {filename} ({len(data)}건)")
     else:
-        # 데이터가 없는데 파일이 남아있다면 삭제
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                print(f"   🗑️ [Queue] 이전 잔여 파일 삭제 완료: {filename}")
-            except Exception as e:
-                print(f"   ⚠️ 파일 삭제 실패: {e}")
-        else:
-            # 데이터도 없고 파일도 없으면 정상
-            print(f"   ℹ️ [Queue] 생성할 데이터 없음: {filename}")
+            except:
+                pass
+            print(f"   ℹ️ [Queue] 데이터 없음: {filename}")
 
 
 def main():
-    # 1. 실행 시 --type 인자를 필수로 받도록 설정
     parser = argparse.ArgumentParser()
-    parser.add_argument('--type', required=True, help="실행할 크롤러 타입 (A, B)")
+    parser.add_argument('--type', required=True, help="크롤러 타입 (A, B...)")
     args = parser.parse_args()
     target_type = args.type.upper()
 
-    # 2. 해당 타입에 맞는 사이트만 필터링 (독립성 보장)
     target_sites = [s for s in SITES if s['type'] == target_type]
-
     if not target_sites:
-        print(f"❌ Type '{target_type}'에 해당하는 사이트 설정이 없습니다.")
+        print(f"❌ 설정된 사이트가 없습니다: {target_type}")
         sys.exit(1)
 
     site_count = len(target_sites)
@@ -89,7 +79,7 @@ def main():
     MAX_WORKERS_CAP = 8
 
     max_workers = 1
-
+    raw_data_map = {}
     # [조건별 상세 분기 로직]
     if site_count <= 4:
         max_workers = site_count
@@ -106,10 +96,6 @@ def main():
     # 스레드 풀 실행
     print(f"Waiting for {site_count} tasks to complete...")
 
-    # 전체 데이터를 모을 리스트
-    all_inserts = []
-    all_updates = []
-
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받음
         future_to_site = {executor.submit(get_crawler, site): site for site in target_sites}
@@ -117,17 +103,40 @@ def main():
         for future in as_completed(future_to_site):
             site = future_to_site[future]
             try:
-                # 스레드로부터 결과(리스트)를 받아옴
-                result = future.result()
+                # 결과 받기: (사이트이름, 수집된데이터)
+                site_name, collected_data = future.result()
 
-                if result:
-                    inserts, updates = result
-                    all_inserts.extend(inserts)
-                    all_updates.extend(updates)
-                    print(f"   ✅ [{site['name']}] 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
+                if collected_data:
+                    raw_data_map[site_name] = collected_data
+                    print(f"   ✅ [{site_name}] 수집 성공: {len(collected_data)}건")
+                else:
+                    print(f"   ⚠️ [{site_name}] 수집된 데이터 없음")
 
             except Exception as e:
-                print(f"🔥 [{site['name']}] 실행 중 오류: {e}")
+                print(f"   🔥 [{site['name']}] 크롤링 에러: {e}")
+
+    # === PHASE 2: 순차 중복 제거 (안전 제일) ===
+    print(f"\n⚙️ [Phase 2] 중복 제거 및 데이터 분류 시작 (순차 처리)...")
+
+    all_inserts = []
+    all_updates = []
+
+    # 수집된 데이터를 하나씩 꺼내서 Deduplicator에게 검사 맡김
+    for site_name, data_list in raw_data_map.items():
+        if not data_list: continue
+
+        # 1. 검사원(Deduplicator) 소환
+        deduper = Deduplicator(site_name)
+
+        # 2. 검사 실행 (여기서 GLOBAL_HASH.json을 읽고 씀 -> 순차 실행이라 안전!)
+        inserts, updates = deduper.process_batch(data_list)
+
+        all_inserts.extend(inserts)
+        all_updates.extend(updates)
+
+        # 로그 출력
+        if len(inserts) > 0 or len(updates) > 0:
+            print(f"   👌 [{site_name}] 분류 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
 
     print(f"[Phase 1] 크롤링 및 중복 제거 완료.")
     print(f"       신규 데이터: {len(all_inserts)}건 / 수정 데이터: {len(all_updates)}건")
