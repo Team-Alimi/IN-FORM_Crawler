@@ -59,34 +59,28 @@ class BaseCrawler:
 
     def run(self):
         """
-        크롤링 및 중복 제거 후 결과 리스트 반환
+        [수정됨]
+        1. 크롤링 수행
+        2. 중복 처리(process_data)는 하지 않음 (Main에서 순차적으로 하기 위해)
+        3. 수집된 '사이트 이름'과 '데이터 리스트'를 튜플로 반환
         """
-        inserts = []
-        updates = []
-
         try:
             self._init_driver()
             self.crawl()
 
-            if self.collected_data:
-                # [수정] 로그 함수 사용
-                self.log("데이터 분류(Deduplication) 중...", "INFO")
-                inserts, updates = self.process_data()
-            else:
-                self.log("수집된 데이터가 없습니다.", "WARN")
+            # [핵심 변경]
+            # 데이터를 가공하거나 저장하지 않고, 수집된 원본(collected_data)을 그대로 반환합니다.
+            print(f"   🚩 [{self.site_name}] 크롤링 종료. 수집된 데이터: {len(self.collected_data)}건")
+            return self.site_name, self.collected_data
 
-        except NotImplementedError:
-            self.log("개발자 오류: crawl 메서드 미구현", "ERROR")
         except Exception as e:
-            self.log(f"상세 에러 리포트:\n{traceback.format_exc()}", "ERROR")
-        finally:
-            if self.driver:
-                try:
-                    self.driver.quit()
-                except:
-                    pass
+            print(f"❌ [{self.site_name}] 실행 중 치명적 오류: {e}")
+            # 에러가 나도 프로그램이 죽지 않게 빈 리스트를 반환
+            return self.site_name, []
 
-        return inserts, updates
+        finally:
+            # 드라이버는 여기서 안전하게 종료
+            self.close()
 
     def process_data(self):
         deduper = Deduplicator(self.site_name)

@@ -8,11 +8,12 @@ from webdriver_manager.chrome import ChromeDriverManager
 from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
 from db_injector import inject_json_to_db
-
+# [추가] 우리가 만든 품질 검사원 불러오기
+from dataprepper.deduplicate import Deduplicator
 
 
 def get_crawler(site_info):
-
+    # 크롤러 객체 생성 로직 (기존과 동일)
     if site_info['type'] == 'A':
         crawler = TypeACrawler(site_info)
     elif site_info['type'] == 'B':
@@ -24,119 +25,104 @@ def get_crawler(site_info):
     elif site_info['type'] == 'E':
         crawler = TypeECrawler(site_info)
     else:
-        print(f"⚠️ 알 수 없는 사이트 타입입니다: {site_info['type']} ({site_info['name']})")
-        return [], []
+        print(f"⚠️ 알 수 없는 사이트 타입: {site_info['type']}")
+        return site_info['name'], []
 
-    return crawler.run()  # run()이 끝나면 tuple 생성됨
+    # [변경] 이제 run()은 (사이트명, 데이터리스트)를 반환합니다.
+    return crawler.run()
+
 
 def save_or_clean(data, filename):
-
     file_path = os.path.join(QUEUE_DIR, filename)
-
     if data:
-        # 데이터가 있으면 저장 (덮어쓰기)
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        print(f"   💾 [Queue] 생성 완료: {filename} ({len(data)}건)")
+        print(f"   💾 [Queue] 저장 완료: {filename} ({len(data)}건)")
     else:
-        # 데이터가 없는데 파일이 남아있다면 삭제
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                print(f"   🗑️ [Queue] 이전 잔여 파일 삭제 완료: {filename}")
-            except Exception as e:
-                print(f"   ⚠️ 파일 삭제 실패: {e}")
-        else:
-            # 데이터도 없고 파일도 없으면 정상
-            print(f"   ℹ️ [Queue] 생성할 데이터 없음: {filename}")
+            except:
+                pass
+            print(f"   ℹ️ [Queue] 데이터 없음: {filename}")
 
 
 def main():
-    # 1. 실행 시 --type 인자를 필수로 받도록 설정
     parser = argparse.ArgumentParser()
-    parser.add_argument('--type', required=True, help="실행할 크롤러 타입 (A, B)")
+    parser.add_argument('--type', required=True, help="크롤러 타입 (A, B...)")
     args = parser.parse_args()
     target_type = args.type.upper()
 
-    # 2. 해당 타입에 맞는 사이트만 필터링 (독립성 보장)
     target_sites = [s for s in SITES if s['type'] == target_type]
-
     if not target_sites:
-        print(f"❌ Type '{target_type}'에 해당하는 사이트 설정이 없습니다.")
+        print(f"❌ 설정된 사이트가 없습니다: {target_type}")
         sys.exit(1)
 
-    site_count = len(target_sites)
-
-    # 2. 드라이버 사전 설치 (Race Condition 방지)
-    print("🔧 Chromedriver 설치 및 경로 확인 중...")
+    # 드라이버 설치
     try:
-        # 여기서 딱 한 번만 설치하고 경로를 받아옵니다.
         driver_path = ChromeDriverManager().install()
-        print(f"✅ Driver Path: {driver_path}")
-
-        # 모든 사이트 정보에 드라이버 경로를 주입합니다.
         for site in target_sites:
             site['driver_path'] = driver_path
-
     except Exception as e:
         print(f"❌ 드라이버 초기화 실패: {e}")
         sys.exit(1)
 
-    # === PHASE 1: 크롤링 & JSON 저장 (유동적 스레드 할당) ===
+    # === PHASE 1: 병렬 크롤링 (속도전) ===
+    # 중복 검사를 나중에 하므로, 크롤링은 최대한 빠르게(8스레드) 돌려도 안전합니다.
+    max_workers = 8
 
-    MAX_WORKERS_CAP = 8
+    # 수집한 데이터를 모아둘 임시 창고
+    raw_data_map = {}
 
-    max_workers = 1
-
-    # [조건별 상세 분기 로직]
-    if site_count <= 4:
-        max_workers = site_count
-        print(f"✨ [Small Batch] 대상 {site_count}개 -> 스레드 {max_workers}개 (1:1 즉시 처리)")
-
-    elif site_count < 8:
-        max_workers = site_count
-        print(f"⚡ [Medium Batch] 대상 {site_count}개 -> 스레드 {max_workers}개 (풀 가동)")
-
-    else:
-        max_workers = MAX_WORKERS_CAP
-        print(f"🔥 [Large Batch] 대상 {site_count}개 -> 스레드 {max_workers}개 (RAM 보호 제한 적용)")
-
-    # 스레드 풀 실행
-    print(f"Waiting for {site_count} tasks to complete...")
-
-    # 전체 데이터를 모을 리스트
-    all_inserts = []
-    all_updates = []
+    print(f"🔥 [Phase 1] {len(target_sites)}개 사이트 동시 크롤링 시작 (Max Threads: {max_workers})...")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받음
         future_to_site = {executor.submit(get_crawler, site): site for site in target_sites}
 
         for future in as_completed(future_to_site):
             site = future_to_site[future]
             try:
-                # 스레드로부터 결과(리스트)를 받아옴
-                result = future.result()
+                # 결과 받기: (사이트이름, 수집된데이터)
+                site_name, collected_data = future.result()
 
-                if result:
-                    inserts, updates = result
-                    all_inserts.extend(inserts)
-                    all_updates.extend(updates)
-                    print(f"   ✅ [{site['name']}] 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
+                if collected_data:
+                    raw_data_map[site_name] = collected_data
+                    print(f"   ✅ [{site_name}] 수집 성공: {len(collected_data)}건")
+                else:
+                    print(f"   ⚠️ [{site_name}] 수집된 데이터 없음")
 
             except Exception as e:
-                print(f"🔥 [{site['name']}] 실행 중 오류: {e}")
+                print(f"   🔥 [{site['name']}] 크롤링 에러: {e}")
 
-    print(f"✨ [Phase 1] 크롤링 완료. 데이터 통합 저장 중...")
+    # === PHASE 2: 순차 중복 제거 (안전 제일) ===
+    print(f"\n⚙️ [Phase 2] 중복 제거 및 데이터 분류 시작 (순차 처리)...")
 
-    # 5. 통합 파일 저장 (JSON 생성)
+    all_inserts = []
+    all_updates = []
+
+    # 수집된 데이터를 하나씩 꺼내서 Deduplicator에게 검사 맡김
+    for site_name, data_list in raw_data_map.items():
+        if not data_list: continue
+
+        # 1. 검사원(Deduplicator) 소환
+        deduper = Deduplicator(site_name)
+
+        # 2. 검사 실행 (여기서 GLOBAL_HASH.json을 읽고 씀 -> 순차 실행이라 안전!)
+        inserts, updates = deduper.process_batch(data_list)
+
+        all_inserts.extend(inserts)
+        all_updates.extend(updates)
+
+        # 로그 출력
+        if len(inserts) > 0 or len(updates) > 0:
+            print(f"   👌 [{site_name}] 분류 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
+
+    # === PHASE 3: 저장 및 DB 주입 ===
+    print(f"\n💾 [Phase 3] 파일 저장 및 DB 업로드...")
     save_or_clean(all_inserts, "INSERT_DATA.json")
     save_or_clean(all_updates, "UPDATE_DATA.json")
 
-     # === PHASE 2: DB Bulk Insert ===
-    print(f"🚀 [Phase 2] DB 업로드 시작")
-    inject_json_to_db()  # 인자 불필요
-
+    inject_json_to_db()
     print(f"🎉 모든 작업 종료.")
 
 
