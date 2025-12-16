@@ -82,6 +82,14 @@ class BaseCrawler:
             # 드라이버는 여기서 안전하게 종료
             self.close()
 
+    def close(self):
+        """브라우저 종료 및 자원 해제"""
+        if hasattr(self, 'driver') and self.driver:
+            try:
+                self.driver.quit()
+            except Exception:
+                pass
+
     def process_data(self):
         deduper = Deduplicator(self.site_name)
         return deduper.process_batch(self.collected_data)
