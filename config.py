@@ -2,6 +2,9 @@ import os
 import pymysql.cursors
 
 # 1. 데이터베이스 설정
+
+
+
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', '127.0.0.1'),
     'port': int(os.getenv('DB_PORT', 13306)),
