@@ -38,12 +38,19 @@ jobs:
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          echo "🎉 배포 시작: Docker Hub에서 최신 이미지 당겨오기..."
+          echo "[1/3] 최신 환경변수 파일(.env) 생성 중..."
           
-          # 1. 최신 이미지 다운로드 (Pull)
+          echo "DB_HOST=${{ secrets.DB_HOST }}" > /home/Alimi/crawler/.env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> /home/Alimi/crawler/.env
+          echo "DB_USER=root" >> /home/Alimi/crawler/.env
+          echo "DB_NAME=informserver" >> /home/Alimi/crawler/.env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> /home/Alimi/crawler/.env
+          
+          chmod 600 /home/Alimi/crawler/.env
+          
+          echo "[2/3] Docker Hub에서 최신 이미지 당겨오기..."
           docker pull ${{ secrets.DOCKER_USERNAME }}/inform-crawler:latest
           
-          # 2. 공간 절약을 위해 사용하지 않는 이미지(dangling) 정리
           docker image prune -f
           
-          echo "✅ 배포 완료! (Crontab이 다음 스케줄부터 이 이미지를 사용합니다)"
+          echo "[3/3] 배포 및 설정 갱신 완료!"
