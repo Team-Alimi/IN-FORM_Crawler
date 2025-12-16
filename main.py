@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse
 import sys
 import os
@@ -7,6 +8,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
+from dataprepper.classifier import AIClassifier
 from db_injector import inject_json_to_db
 
 
@@ -127,13 +129,26 @@ def main():
             except Exception as e:
                 print(f"🔥 [{site['name']}] 실행 중 오류: {e}")
 
-    print(f"✨ [Phase 1] 크롤링 완료. 데이터 통합 저장 중...")
+    print(f"[Phase 1] 크롤링 및 중복 제거 완료.")
+    print(f"       신규 데이터: {len(all_inserts)}건 / 수정 데이터: {len(all_updates)}건")
+
+    # === PHASE 2: AI 기반 카테고리 분류 ===
+
+    if all_inserts:
+        # 1. 분류기 생성
+        ai_classifier = AIClassifier()
+
+        # 2. 신규 데이터(all_inserts)만 넣어서 분류 실행
+        all_inserts = ai_classifier.classify_batch(all_inserts)
+
+    print("[Phase 2] AI 기반 카테고리 분류 완료.")
+
 
     # 5. 통합 파일 저장 (JSON 생성)
     save_or_clean(all_inserts, "INSERT_DATA.json")
     save_or_clean(all_updates, "UPDATE_DATA.json")
 
-     # === PHASE 2: DB Bulk Insert ===
+     # === PHASE 3: DB Bulk Insert ===
     print(f"🚀 [Phase 2] DB 업로드 시작")
     inject_json_to_db()  # 인자 불필요
 
