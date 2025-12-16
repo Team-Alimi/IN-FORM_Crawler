@@ -90,8 +90,14 @@ class TypeBCrawler(BaseCrawler):
 
     def _parse_detail_page(self, title_text, date_obj, cat_id, unique_id):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-        content = soup.select_one('.board-view-cnt').get_text('\n', strip=True) if soup.select_one(
-            '.board-view-cnt') else ""
+        content_div = soup.select_one('.board-view-cnt')
+        content = ""
+
+        if content_div:
+            # 스타일 태그 벗겨내기
+            for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font']):
+                tag.unwrap()
+            content = content_div.get_text('\n', strip=True)
 
         if not content:
             self.log(f"본문 없음 (Skip): {title_text[:30]}...", "WARN")
