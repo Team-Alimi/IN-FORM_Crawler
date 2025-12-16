@@ -4,3 +4,4 @@ beautifulsoup4
 pymysql
 python-dateutil
 cryptography
+google-generativeai

@@ -12,24 +12,70 @@ DB_CONFIG = {
     'cursorclass': pymysql.cursors.DictCursor
 }
 
-# 2. 타겟 키워드
+# 2. Gemini API KEY 로드
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
+# 3. Gemini API 학습용 가이드
+CATEGORY_GUIDE = {
+    # [0: Exclude]
+    0: "Delete/Ignore (단순 학사 행정, 졸업, 예비군, 수강신청, 시스템 점검 등 학생 모집과 무관한 공지)",
+
+    # [1: Lecture] 일반적 지식 전달, '취업' 설명회
+    1: "Lecture (특강, 세미나, 기술 세션, 멘토링, 일반적인 기업 채용 설명회 - 단, 특정 '부트캠프/활동'의 설명회는 4번으로 분류)",
+
+    # [2: Contest] 창작물 제출
+    2: "Contest (공모전, 챌린지 - 아이디어, 디자인, 영상 등 창작물을 제출하여 심사받는 형태)",
+
+    # [3: Competition] 실력 겨루기
+    3: "Competition (경진대회, 해커톤, 아이디어톤, 메이커톤 - 실시간/단기 경쟁 대회)",
+
+    # [4: Activity] 활동/교육 + '관련 설명회' (여기가 핵심!)
+    4: "Activity & Training (부트캠프, 대외활동, 봉사단, 서포터즈, 국비지원교육(KDT), 프로젝트 과정 및 **이와 관련된 모집 설명회/상담회**)",
+
+    # [5: Scholarship] 금전 지원
+    5: "Scholarship (장학금, 학자금 대출, 생활비 지원, 등록금 관련)"
+}
+
+# 4. 타겟 키워드
 KEYWORD_CATEGORIES = {
-    0: [ #EXCLUDE
-        "강의진단", "강의평가", "졸업인증", "예비군", "점검", "졸업요건", "다학년프로젝트"
+    # [0: Exclude] 크롤링 단계에서 즉시 제외할 키워드
+    0: [
+        "강의진단", "강의평가", "졸업인증", "예비군", "점검", "졸업요건", "다학년프로젝트",
+        "수강신청", "휴학", "복학", "전과", "예비군"
     ],
-    1: [ #LECTURE
-        "세미나", "설명회", "멘토링", "특강", "강의", "워크숍", "박람회", "GDG", "데이", "Google", "School", "Symposium", "LG", "SK", "하이닉스", "삼성", "Samsung", "AWS", "Microsoft", "Naver", "KT"
+
+    # [1: Lecture] 단순 청강, 정보 전달, 기업 설명회
+    1: [
+        "세미나", "설명회", "멘토링", "특강", "강의", "워크숍", "박람회",
+        "GDG", "Google", "School", "Symposium",
+        "LG", "SK", "하이닉스", "삼성", "Samsung", "AWS", "Microsoft", "Naver", "KT"
     ],
-    2: [ #CONTEST
-        "공모전", "챌린지", "challenge", "프로젝트", "project", "훈련", "내일배움카드"
+
+    # [2: Contest] 공모전
+    2: [
+        "공모전", "챌린지", "challenge"
     ],
-    3: [ #COMPETITION
-        "경진", "대회", "해커톤", "hackerthon", "메이커톤", "makerthon", "아이디어톤", "ideathon", "콘테스트", "contest", "캠프", "camp"
+
+    # [3: Competition] 대회
+    3: [
+        "경진", "대회", "해커톤", "hackerthon", "메이커톤", "makerthon",
+        "아이디어톤", "ideathon", "콘테스트", "contest", "대상", "최우수상"
+    ],
+
+    # [4: Activity] 부트캠프, 대외활동, 봉사, 교류
+    4: [
+        "부트캠프", "bootcamp", "캠프", "camp", "서포터즈", "기자단", "봉사",
+        "홍보대사", "동아리", "학회", "활동", "체험", "탐방",
+        "프로젝트", "project", "훈련", "training", "내일배움카드", "KDT", "K-Digital Training", "국비"
+    ],
+
+    # [5: Scholarship] 장학
+    5: [
+        "장학", "장학생", "학자금", "등록금", "지원금", "생활비"
     ]
 }
 
-# 3. 사이트 목록 정의
-# vendor_id: DB의 vendors 테이블에 존재하는 ID여야 합니다. (FK 제약조건)
+# 5. 사이트 목록 정의
 SITES = [
     # === TYPE A (오전 9시 실행 그룹) ===
     {
@@ -326,7 +372,7 @@ SITES = [
     # ... E타입 사이트 2개 ...
 ]
 
-# 4. 크롤링 결과 JSON으로 저장
+# 6. 크롤링 결과 JSON으로 저장
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.join(BASE_DIR, 'data')
 
