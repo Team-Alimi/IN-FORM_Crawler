@@ -1,6 +1,7 @@
 import json
 import os
 import hashlib
+
 from config import HISTORY_DIR
 
 
@@ -34,7 +35,7 @@ class Deduplicator:
             return set()
 
     def _update_global_hash_file(self):
-        """통합 지문 파일 덮어쓰기 (max_workers=1 전제)"""
+        """통합 지문 파일 덮어쓰기"""
         with open(self.global_hash_path, 'w', encoding='utf-8') as f:
             json.dump(list(self.global_hash_set), f, ensure_ascii=False, indent=4)
 
@@ -75,7 +76,7 @@ class Deduplicator:
                     self.global_hash_set.add(fingerprint)
                     new_hashes_to_save.add(fingerprint)
             else:
-                # [수정 체크]
+                # [수정]
                 old_art = self.history_map[uid]
                 if (article['title'] != old_art.get('title') or
                         article['content'] != old_art.get('content')):

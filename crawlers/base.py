@@ -34,7 +34,7 @@ class BaseCrawler:
         if level == "START": icon = "🚀"
         elif level == "SUCCESS": icon = "✅"
         elif level == "WARN": icon = "⚠️"
-        elif level == "ERROR": icon = "🔥"
+        elif level == "ERROR": icon = "❌"
         elif level == "STOP": icon = "🛑"
         elif level == "COLLECT": icon = "✨"
 
@@ -70,7 +70,7 @@ class BaseCrawler:
 
             # [핵심 변경]
             # 데이터를 가공하거나 저장하지 않고, 수집된 원본(collected_data)을 그대로 반환합니다.
-            print(f"   🚩 [{self.site_name}] 크롤링 종료. 수집된 데이터: {len(self.collected_data)}건")
+            print(f"   🛑 [{self.site_name}] 크롤링 종료. 수집된 데이터: {len(self.collected_data)}건")
             return self.site_name, self.collected_data
 
         except Exception as e:
