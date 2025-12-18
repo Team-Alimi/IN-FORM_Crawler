@@ -16,7 +16,7 @@ DB_CONFIG = {
 }
 
 # 2. Gemini API KEY 로드
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyB8Px6izUcUh25SPwUsqtKrFmM6G2xE47A')
 
 # 3. Gemini API 학습용 가이드
 CATEGORY_GUIDE = {
