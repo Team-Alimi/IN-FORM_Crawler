@@ -59,14 +59,14 @@ class Deduplicator:
             uid = article.get('unique_id')
             fingerprint = self._make_content_fingerprint(article)
 
-            # 1. Global 중복 검사 (타 사이트와 본문 일치 여부)
+            # Global 중복 검사 (타 사이트와 본문 일치 여부)
             if fingerprint and fingerprint in self.global_hash_set:
                 # 내 장부에는 없는데 글로벌 장부에 있다면 -> 타 사이트 중복 글
                 if uid not in self.history_map:
                     print(f"   ✂️ [Global 중복] 본문 일치 제거: {article['title'][:15]}...")
                     continue
 
-            # 2. Local 장부 검사 (신규/수정 판단)
+            # Local 장부 검사 (신규/수정 판단)
             if uid not in self.history_map:
                 # [신규]
                 to_insert.append(article)

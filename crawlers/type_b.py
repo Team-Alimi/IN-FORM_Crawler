@@ -9,7 +9,6 @@ from .base import BaseCrawler
 class TypeBCrawler(BaseCrawler):
 
     def crawl(self):
-        # [리팩터링]
         self.log(f"Type B 크롤링 시작 (Limit: {self.limit_date.strftime('%Y-%m-%d')})", "START")
 
         page = 0
@@ -51,7 +50,6 @@ class TypeBCrawler(BaseCrawler):
                 date_obj = self.parse_date_raw(date_text)
                 if date_obj is None: continue
 
-                # [수정] self.limit_date
                 if date_obj < self.limit_date:
                     if is_pinned: continue
                     old_streak += 1

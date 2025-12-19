@@ -46,6 +46,7 @@ jobs:
           echo "DB_USER=root" >> /home/Alimi/crawler/.env
           echo "DB_NAME=informserver" >> /home/Alimi/crawler/.env
           echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> /home/Alimi/crawler/.env
+          echo 'GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}' >> /home/Alimi/crawler/.env
           
           chmod 600 /home/Alimi/crawler/.env
           

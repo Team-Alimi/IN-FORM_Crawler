@@ -10,7 +10,6 @@ from .base import BaseCrawler
 class TypeCCrawler(BaseCrawler):
 
     def crawl(self):
-        # [리팩터링]
         self.log(f"Type C 크롤링 시작", "START")
         self.driver.get(self.url)
 
@@ -37,7 +36,6 @@ class TypeCCrawler(BaseCrawler):
                 self.log(f"탭 이동 실패: {e}", "ERROR")
 
     def _crawl_current_tab_list(self, tab_name, tab_id):
-        # [수정] self.limit_date 사용 (지역변수 삭제)
         page = 1
 
         while True:
@@ -70,7 +68,6 @@ class TypeCCrawler(BaseCrawler):
                 date_obj = self.parse_date_raw(date_text)
                 if date_obj is None: continue
 
-                # [수정] self.limit_date
                 if date_obj < self.limit_date: continue
 
                 cat_id = self.match_category(title_text)
@@ -116,7 +113,7 @@ class TypeCCrawler(BaseCrawler):
 
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-        # [수정] 여러 선택지 중 하나를 찾은 뒤 unwrap 적용
+        # 여러 선택지 중 하나를 찾은 뒤 unwrap 적용
         content_div = soup.select_one('#IContents_div내용')
         if not content_div:
             content_div = soup.select_one('.board-view-cont')

@@ -11,7 +11,6 @@ from .base import BaseCrawler
 class TypeECrawler(BaseCrawler):
 
     def crawl(self):
-        # [리팩터링] self.log 사용
         self.log("Type E 크롤링 시작", "START")
 
         target_tabs = [1, 2]
@@ -134,29 +133,29 @@ class TypeECrawler(BaseCrawler):
     def _parse_detail_page(self, title_text, start_str, due_str, cat_id, unique_id):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-        # [수정] 선택 로직 후 unwrap 적용
+        # 선택 로직 후 unwrap 적용
         content_div = soup.select_one('.viewcontent span.Info')
         if not content_div:
             content_div = soup.select_one('.viewcontent')
 
         content = ""
         if content_div:
-            # [1] <br> -> \n
+            # <br> -> \n
             for br in content_div.find_all('br'):
                 br.replace_with('\n')
 
-            # [2] 블록 태그 뒤에 \n 추가
+            # 블록 태그 뒤에 \n 추가
             for block in content_div.find_all(['p', 'div', 'li', 'tr']):
                 block.append('\n')
 
-            # [3] 인라인 태그 unwrap
+            # 인라인 태그 unwrap
             for tag in content_div.find_all(['span', 'b', 'strong', 'i', 'u', 'font', 'a', 'label']):
                 tag.unwrap()
 
-            # [4] 텍스트 추출 (구분자: 공백)
+            # 텍스트 추출 (구분자: 공백)
             content = content_div.get_text(' ', strip=True)
 
-            # [5] 정규식 정리
+            # 정규식 정리
             import re
             content = re.sub(r'[ \t]*\n[ \t]*', '\n', content)
             content = re.sub(r'\n{3,}', '\n\n', content)

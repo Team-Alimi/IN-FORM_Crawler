@@ -58,7 +58,7 @@ def main():
 
     site_count = len(target_sites)
 
-    # 2. 드라이버 사전 설치 (Race Condition 방지)
+    # 드라이버 사전 설치
     print("🔧 Chromedriver 설치 및 경로 확인 중...")
     try:
         # 여기서 딱 한 번만 설치하고 경로를 받아옵니다.
@@ -96,7 +96,7 @@ def main():
     print(f"Waiting for {site_count} tasks to complete...")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 1. 작업을 하나씩 제출하고 '이름표(future)'를 받음
+        # 작업을 하나씩 제출하고 '이름표(future)'를 받음
         future_to_site = {executor.submit(get_crawler, site): site for site in target_sites}
 
         for future in as_completed(future_to_site):
@@ -114,7 +114,7 @@ def main():
             except Exception as e:
                 print(f"   🔥 [{site['name']}] 크롤링 에러: {e}")
 
-    # === PHASE 2: 순차 중복 제거 (안전 제일) ===
+    # === PHASE 2: 순차 중복 제거 ===
     print(f"\n⚙️ [Phase 2] 중복 제거 및 데이터 분류 시작 (순차 처리)...")
 
     all_inserts = []
@@ -124,23 +124,20 @@ def main():
     for site_name, data_list in raw_data_map.items():
         if not data_list: continue
 
-        # 1. 검사원(Deduplicator) 소환
         deduper = Deduplicator(site_name)
 
-        # 2. 검사 실행 (여기서 GLOBAL_HASH.json을 읽고 씀 -> 순차 실행이라 안전!)
         inserts, updates = deduper.process_batch(data_list)
 
         all_inserts.extend(inserts)
         all_updates.extend(updates)
 
-        # 로그 출력
         if len(inserts) > 0 or len(updates) > 0:
             print(f"   👌 [{site_name}] 분류 완료 (신규: {len(inserts)}, 수정: {len(updates)})")
 
     print(f"[Phase 1] 크롤링 및 중복 제거 완료.")
     print(f"       신규 데이터: {len(all_inserts)}건 / 수정 데이터: {len(all_updates)}건")
 
-    # === PHASE 2: AI 기반 카테고리 분류 및 날짜 추출 ===
+    # === PHASE 3: AI 기반 카테고리 분류 및 날짜 추출 ===
 
     if all_inserts:
         ai_processor = AIProcessor()
@@ -149,13 +146,13 @@ def main():
     print("[Phase 2] AI 기반 카테고리 분류 및 날짜 추출 완료.")
 
 
-    # 5. 통합 파일 저장 (JSON 생성)
+    # 통합 파일 저장 (JSON 생성)
     save_or_clean(all_inserts, "INSERT_DATA.json")
     save_or_clean(all_updates, "UPDATE_DATA.json")
 
-    #  # === PHASE 3: DB Bulk Insert ===
-    # print(f"🚀 [Phase 2] DB 업로드 시작")
-    # inject_json_to_db()  # 인자 불필요
+     # === PHASE 4: DB Bulk Insert ===
+    print(f"🚀 [Phase 2] DB 업로드 시작")
+    inject_json_to_db()
 
     print(f"🎉 모든 작업 종료.")
 

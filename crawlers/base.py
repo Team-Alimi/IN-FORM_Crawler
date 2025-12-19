@@ -25,10 +25,10 @@ class BaseCrawler:
         self.collected_data = []
         self.wait = None
 
-        # [리팩터링] 자식들이 매번 계산하지 않게 여기서 미리 계산
+        # 자식들이 매번 계산하지 않게 여기서 미리 계산
         self.limit_date = self.get_limit_date()
 
-    # [리팩터링] 모든 크롤러가 공통으로 사용할 로그 출력 함수 추가
+    # 모든 크롤러가 공통으로 사용할 로그 출력 함수 추가
     def log(self, message, level="INFO"):
         icon = "📄"
         if level == "START": icon = "🚀"
@@ -59,7 +59,6 @@ class BaseCrawler:
 
     def run(self):
         """
-        [수정됨]
         1. 크롤링 수행
         2. 중복 처리(process_data)는 하지 않음 (Main에서 순차적으로 하기 위해)
         3. 수집된 '사이트 이름'과 '데이터 리스트'를 튜플로 반환
@@ -68,7 +67,6 @@ class BaseCrawler:
             self._init_driver()
             self.crawl()
 
-            # [핵심 변경]
             # 데이터를 가공하거나 저장하지 않고, 수집된 원본(collected_data)을 그대로 반환합니다.
             print(f"   🛑 [{self.site_name}] 크롤링 종료. 수집된 데이터: {len(self.collected_data)}건")
             return self.site_name, self.collected_data

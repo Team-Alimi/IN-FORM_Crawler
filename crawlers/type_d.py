@@ -8,7 +8,6 @@ from .base import BaseCrawler
 class TypeDCrawler(BaseCrawler):
 
     def crawl(self):
-        # [리팩터링] limit_date 삭제 및 self.log 사용
         self.log(f"Type D 크롤링 시작 (Limit: {self.limit_date.strftime('%Y-%m-%d')})", "START")
 
         target_tabs = [1, 3, 4]
@@ -70,7 +69,6 @@ class TypeDCrawler(BaseCrawler):
                     date_obj = self.parse_date_raw(date_text)
                     if date_obj is None: continue
 
-                    # [수정] self.limit_date
                     if date_obj < self.limit_date:
                         old_streak += 1
                         if old_streak >= 20:
@@ -114,7 +112,7 @@ class TypeDCrawler(BaseCrawler):
     def _parse_detail_page(self, title_text, date_obj, cat_id, tab_id, num_text):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
 
-        # [수정] unwrap 로직 적용
+        # unwrap 로직 적용
         content_div = soup.select_one('.contents_wrap')
         content = ""
 
