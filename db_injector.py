@@ -10,12 +10,12 @@ def inject_json_to_db():
     지정된 사이트들의 JSON 파일을 읽어서 DB에 Bulk Insert 수행
     target_sites: main.py에서 넘겨준 사이트 정보 리스트
     """
-    # 1. DB 연결 (한 번만 연결해서 재사용)
+    # DB 연결 (한 번만 연결해서 재사용)
     conn = pymysql.connect(**DB_CONFIG)
 
     try:
         with conn.cursor() as cursor:
-            # 2. 통합 INSERT 처리
+            # 통합 INSERT 처리
             insert_path = os.path.join(QUEUE_DIR, "INSERT_DATA.json")
             if os.path.exists(insert_path):
                 print(f"📥 통합 데이터(INSERT) 업로드 시작...")
@@ -23,11 +23,10 @@ def inject_json_to_db():
                     data = json.load(f)
 
                 if data:
-                    # 3. Bulk Insert 쿼리 준비
                     sql = """
                           INSERT INTO school_articles
-                              (title, content, original_url, created_at, updated_at, vendor_id, category_id)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                              (title, content, original_url, start_date, due_date, created_at, updated_at, vendor_id, category_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
                           ON DUPLICATE KEY UPDATE 
                               content = VALUES(content);
                               
@@ -36,11 +35,13 @@ def inject_json_to_db():
                     values = [
                         (
                             item['title'], item['content'], item['original_url'],
-                            item['created_at'], item['updated_at'], item['vendor_id'], item['category_id']
+                            item['start_date'], item['due_date'], item['created_at'], item['updated_at'],
+                            item['vendor_id'], item['category_id']
                         )
                         for item in data
                     ]
 
+                    # 일괄 실행
                     cursor.executemany(sql, values)
                     conn.commit()
                     print(f"   ✅ {len(values)}건 Insert 완료.")
@@ -48,7 +49,7 @@ def inject_json_to_db():
                     # 처리 후 파일 삭제 (옵션)
                     os.remove(insert_path)
 
-            # 3. 통합 UPDATE 처리
+            # 통합 UPDATE 처리
             update_path = os.path.join(QUEUE_DIR, "UPDATE_DATA.json")
             if os.path.exists(update_path):
                 print(f"🔄 통합 데이터(UPDATE) 처리 시작...")
@@ -56,9 +57,36 @@ def inject_json_to_db():
                     data = json.load(f)
 
                 if data:
-                    print(f"   ℹ️ {len(data)}건의 데이터가 업데이트 대기 중입니다.")
-                    # 개발 보류
+                    sql = """
+                          UPDATE school_articles
+                          SET title       = %s,
+                              content     = %s,
+                              start_date  = %s,
+                              due_date    = %s,
+                              updated_at  = %s,
+                              category_id = %s
+                          WHERE original_url = %s \
+                          """
+                    # 딕셔너리 리스트를 튜플 리스트로 변환
+                    values = [
+                        (
+                            item['title'],
+                            item['content'],
+                            item.get('start_date'),  # 날짜 정보가 없을 경우 None 처리
+                            item.get('due_date'),
+                            item['updated_at'],
+                            item['category_id'],
+                            item['original_url']
+                        )
+                        for item in data
+                    ]
 
+                    # 일괄 실행
+                    cursor.executemany(sql, values)
+                    conn.commit()
+                    print(f"   ✅ {len(values)}건 Update 완료.")
+
+                    # 처리 후 파일 삭제
                     os.remove(update_path)
 
     except Exception as e:
