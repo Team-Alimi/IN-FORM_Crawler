@@ -33,10 +33,16 @@ def inject_json_to_db():
                           """
                     # 딕셔너리 리스트를 튜플 리스트로 변환
                     values = [
-                        (
-                            item['title'], item['content'], item['original_url'],
-                            item['start_date'], item['due_date'], item['created_at'], item['updated_at'],
-                            item['vendor_id'], item['category_id']
+                        (   
+                            item.get('title'),
+                            item.get('content'),
+                            item.get('original_url'),
+                            item.get('start_date', None),  # 키가 없으면 None 반환
+                            item.get('due_date', None),    # 키가 없으면 None 반환
+                            item.get('created_at'),
+                            item.get('updated_at'),
+                            item.get('vendor_id'),
+                            item.get('category_id')
                         )
                         for item in data
                     ]
