@@ -1,5 +1,5 @@
-# 1. 파이썬 3.9 슬림 버전
-FROM python:3.9-slim
+# 1. 파이썬 3.11 슬림 버전
+FROM python:3.11-slim
 
 # 2. 필수 시스템 패키지 설치
 # (wget, gnupg, unzip, curl 등 설치)
