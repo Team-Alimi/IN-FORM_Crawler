@@ -193,7 +193,23 @@ python main.py --type B
 | :---: | :--- | :---: | :---: |
 | 101 | **추가예정** | `COMING` | `SOON` |
 
+## 📝 License
+
+![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge&logo=license&logoColor=white)
+
+본 프로젝트의 소스 코드는 **MIT License**를 따릅니다.
+
+> **⚠️**
+> 단, 크롤링 대상 사이트(**인하대학교 및 산하 기관**)의 콘텐츠(게시글, 이미지 등)에 대한 모든 권리는 해당 저작권자에게 있습니다.
+
 ## 👥 Contact
 
-team.alimi.inform@gmail.com
+**Team Alimi**에게 전하고 싶은 말씀이 있으신가요? 목적에 맞게 아래 채널로 연락해 주세요!
 
+| **분류 (Category)** | **채널 (Channel)** |
+| :--- | :--- |
+| 🐛 **버그 제보  기능 요청** | [**GitHub Issues**](../../issues) |
+| 📧 **기타 문의사항** | [**team.alimi.inform@gmail.com**](mailto:team.alimi.inform@gmail.com) |
+
+[![GitHub Issues](https://img.shields.io/badge/GitHub%20Issues-Bug%20Report%20%26%20Feature%20Request-green?style=for-the-badge&logo=github)](../../issues)
+[![Email](https://img.shields.io/badge/Team%20Alimi-team.alimi.inform%40gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:team.alimi.inform@gmail.com)
