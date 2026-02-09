@@ -76,9 +76,8 @@ IN-FORM_Crawler/
 
 1. 저장소 클론
 ```bash
-git clone [https://github.com/Team-Alimi/IN-FORM_Crawler.git](https://github.com/Team-Alimi/IN-FORM_Crawler.git)
+git clone https://github.com/Team-Alimi/IN-FORM_Crawler.git
 cd IN-FORM_Crawler
-
 ```
 
 2. 가상환경 생성 및 활성화 **(권장)**
@@ -89,20 +88,17 @@ python -m venv venv
 source venv/bin/activate
 # Windows
 .\venv\Scripts\activate
-
 ```
 
 3. 의존성 설치
 ```bash
 pip install -r requirements.txt
-
 ```
 
 4. Playwright 브라우저 설치
 *동적 크롤링(Type B, C)을 위한 브라우저 바이너리를 설치합니다.*
 ```bash
 playwright install
-
 ```
 
 ### ⚙️ 설정 (.env)
@@ -123,7 +119,6 @@ DB_NAME=informserver
 
 # Gemini API (게시글 분류용)
 GEMINI_API_KEY=your_api_key_here
-
 ```
 
 ### 🚀 실행
@@ -136,7 +131,6 @@ python main.py --type A
 
 # Type B 사이트 크롤링 (Playwright 기반 동적 수집)
 python main.py --type B
-
 ```
 
 ### 🔄 CI/CD Pipeline
