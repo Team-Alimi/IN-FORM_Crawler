@@ -80,63 +80,63 @@ SITES = [
     # === TYPE A (오전 9시 실행 그룹) ===
     {
         'type': 'A',
-        'name': 'Inha_Engineering',
+        'name': '공과대학',
         'code': 'IE',
         'url': 'https://engcollege.inha.ac.kr/engineering/9743/subview.do',
         'vendor_id': 1
     },
     {
         'type': 'A',
-        'name': 'Inha_Mech',
+        'name': '기계공학과',
         'code': 'MEG',
         'url': 'https://mech.inha.ac.kr/mech/1823/subview.do',
         'vendor_id': 2
     },
     {
         'type': 'A',
-        'name': 'Inha_AeroSpace',
+        'name': '항공우주공학과',
         'code': 'ASE',
         'url': 'https://aerospace.inha.ac.kr/aerospace/9846/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGYWVyb3NwYWNlJTJGMjQ4NSUyRmFydGNsTGlzdC5kbyUzRmJic0NsU2VxJTNEMTI4NyUyNmJic09wZW5XcmRTZXElM0QlMjZpc1ZpZXdNaW5lJTNEZmFsc2UlMjZzcmNoQ29sdW1uJTNEc2olMjZzcmNoV3JkJTNEJTI2',
         'vendor_id': 3
     },
     {
         'type': 'A',
-        'name': 'Inha_ShipBuildingMarine',
+        'name': '조선해양공학과',
         'code': 'NOE',
         'url': 'https://naoe.inha.ac.kr/naoe/1791/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGbmFvZSUyRjQ3NyUyRmFydGNsTGlzdC5kbyUzRmJic0NsU2VxJTNEMzMxJTI2YmJzT3BlbldyZFNlcSUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnNyY2hDb2x1bW4lM0RzaiUyNnNyY2hXcmQlM0QlMjY%3D',
         'vendor_id': 4
     },
     {
         'type': 'A',
-        'name': 'Inha_IndustrialEngine',
-        'code': 'IENA',
+        'name': '산업경영공학과',
+        'code': 'IEN',
         'url': 'https://ie.inha.ac.kr/ie/963/subview.do',
         'vendor_id': 5
     },
     {
         'type': 'A',
-        'name': 'Inha_ChemicalEngine',
+        'name': '화학공학과',
         'code': 'CHE',
         'url': 'https://chemeng.inha.ac.kr/chemeng/2220/subview.do',
         'vendor_id': 6
     },
     {
         'type': 'A',
-        'name': 'Inha_Polymer',
+        'name': '고분자공학과',
         'code': 'PSE',
         'url': 'https://inhapoly.inha.ac.kr/inhapoly/2321/subview.do',
         'vendor_id': 7
     },
     {
         'type': 'A',
-        'name': 'Inha_Material',
+        'name': '신소재공학과',
         'code': 'MSE',
         'url': 'https://dmse.inha.ac.kr/dmse/2121/subview.do',
         'vendor_id': 8
     },
     {
         'type': 'A',
-        'name': 'Inha_CivilInfra',
+        'name': '사회인프라공학과',
         'code': 'CIV',
         'url': 'https://civil.inha.ac.kr/civil/2383/subview.do',
         'vendor_id': 9
@@ -144,7 +144,7 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_Environment',
+        'name': '환경공학과',
         'code': 'ENV',
         'url': 'https://environment.inha.ac.kr/environment/2541/subview.do',
         'vendor_id': 10
@@ -152,7 +152,7 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_GeoInfo',
+        'name': '공간정보공학과',
         'code': 'GEO',
         'url': 'https://geoinfo.inha.ac.kr/geoinfo/2678/subview.do',
         'vendor_id': 11
@@ -160,14 +160,14 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_Arch',
+        'name': '건축학부',
         'code': 'ARC',
         'url': 'https://arch.inha.ac.kr/arch/2161/subview.do',
         'vendor_id': 12
     },
     {
         'type': 'A',
-        'name': 'Inha_Energy',
+        'name': '에너지자원공학과',
         'code': 'ENR',
         'url': 'https://eneres.inha.ac.kr/eneres/3441/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGZW5lcmVzJTJGODMwJTJGYXJ0Y2xMaXN0LmRvJTNGYmJzQ2xTZXElM0QyMDM2JTI2YmJzT3BlbldyZFNlcSUzRCUyNmlzVmlld01pbmUlM0RmYWxzZSUyNnNyY2hDb2x1bW4lM0RzaiUyNnNyY2hXcmQlM0QlMjY%3D',
         'vendor_id': 13
@@ -175,7 +175,7 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_electronic',
+        'name': '전기전자공학부',
         'code': 'EEC',
         'url': 'https://ee.inha.ac.kr/eee/16344/subview.do',
         'vendor_id': 14
@@ -183,7 +183,7 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_SSE',
+        'name': '반도체시스템공학과',
         'code': 'SSE',
         'url': 'https://sse.inha.ac.kr/sse/14301/subview.do',
         'vendor_id': 15
@@ -191,15 +191,15 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_Swcc_Announcement',
-        'code': 'ITCA',
+        'name': '소프트웨어융합대학',
+        'code': 'ITCU',
         'url': 'https://swcc.inha.ac.kr/act/2970/subview.do',
         'vendor_id': 16
     },
 
     {
         'type': 'A',
-        'name': 'Inha_Swcc_Uni_Announcement',
+        'name': '소프트웨어융합대학',
         'code': 'ITCU',
         'url': 'https://swcc.inha.ac.kr/act/2971/subview.do',
         'vendor_id': 16
@@ -207,15 +207,15 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_Ai_Announcement',
-        'code': 'AIEA',
+        'name': '인공지능공학과',
+        'code': 'AIEE',
         'url': 'https://doai.inha.ac.kr/doai/3046/subview.do',
         'vendor_id': 17
     },
 
     {
         'type': 'A',
-        'name': 'Inha_Ai_Event',
+        'name': '인공지능공학과',
         'code': 'AIEE',
         'url': 'https://doai.inha.ac.kr/doai/3047/subview.do',
         'vendor_id': 17
@@ -223,45 +223,45 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_DataScience_Announcement',
-        'code': 'DSCA',
+        'name': '데이터사이언스학과',
+        'code': 'DSC',
         'url': 'https://datascience.inha.ac.kr/datascience/3125/subview.do',
         'vendor_id': 18
     },
 
     {
         'type': 'A',
-        'name': 'Inha_DataScience_Contest',
-        'code': 'DSCC',
+        'name': '데이터사이언스학과',
+        'code': 'DSC',
         'url': 'https://datascience.inha.ac.kr/datascience/11588/subview.do',
         'vendor_id': 18
     },
 
     {
         'type': 'A',
-        'name': 'Inha_DataScience_Event',
-        'code': 'DSCE',
+        'name': '데이터사이언스학과',
+        'code': 'DSC',
         'url': 'https://datascience.inha.ac.kr/datascience/3126/subview.do',
         'vendor_id': 18
     },
     {
         'type': 'A',
-        'name': 'Inha_SmartMobile_Announcement',
-        'code': 'SMEA',
+        'name': '스마트모빌리티공학',
+        'code': 'SME',
         'url': 'https://sme.inha.ac.kr/sme/2867/subview.do',
         'vendor_id': 19
     },
     {
         'type': 'A',
-        'name': 'Inha_SmartMobile_Event',
-        'code': 'SMEE',
+        'name': '스마트모빌리티공학',
+        'code': 'SME',
         'url': 'https://sme.inha.ac.kr/sme/2878/subview.do',
         'vendor_id': 19
     },
 
     {
         'type': 'A',
-        'name': 'Inha_DesignTech',
+        'name': '디자인테크놀로지학과',
         'code': 'DET',
         'url': 'https://designtech.inha.ac.kr/designtech/3083/subview.do',
         'vendor_id': 20
@@ -269,43 +269,212 @@ SITES = [
 
     {
         'type': 'A',
-        'name': 'Inha_CSE_Announcement',
-        'code': 'CSEA',
+        'name': '컴퓨터공학과',
+        'code': 'CSE',
         'url': 'https://cse.inha.ac.kr/cse/888/subview.do',
         'vendor_id': 21
     },
 
     {
         'type': 'A',
-        'name': 'Inha_CSE_Contest',
-        'code': 'CSEC',
+        'name': '컴퓨터공학과',
+        'code': 'CSE',
         'url': 'https://cse.inha.ac.kr/cse/891/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGY3NlJTJGMjQ0JTJGYXJ0Y2xMaXN0LmRvJTNGYmJzQ2xTZXElM0QxNDgzNjAlMjZiYnNPcGVuV3JkU2VxJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2c3JjaENvbHVtbiUzRHNqJTI2c3JjaFdyZCUzRCUyNg%3D%3D',
         'vendor_id': 21
     },
 
     {
         'type': 'A',
-        'name': 'Inha_IndustrialEngine_Event',
-        'code': 'IENE',
+        'name': '산업경영공학과',
+        'code': 'IEN',
         'url' : 'https://ie.inha.ac.kr/ie/979/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGaWUlMkYyNzclMkZhcnRjbExpc3QuZG8lM0ZiYnNDbFNlcSUzRDE4ODglMjZiYnNPcGVuV3JkU2VxJTNEJTI2aXNWaWV3TWluZSUzRGZhbHNlJTI2c3JjaENvbHVtbiUzRHNqJTI2c3JjaFdyZCUzRCUyNg%3D%3D',
         'vendor_id': 5
     },
 
     {
         'type': 'A',
-        'name': 'Inha_swuniv_Announcement',
-        'code': 'SWUA',
+        'name': '소프트웨어중심대학사업단',
+        'code': 'SWU',
         'url': 'https://swuniv.inha.ac.kr/swuniv/12703/subview.do',
         'vendor_id': 22
     },
 
     {
         'type': 'A',
-        'name': 'Inha_swuniv_Event',
-        'code': 'SWUE',
+        'name': '소프트웨어중심대학사업단',
+        'code': 'SWU',
         'url': 'https://swuniv.inha.ac.kr/swuniv/15747/subview.do',
         'vendor_id': 22
     },
+
+    {
+        'type': 'A',
+        'name': '이차전지융합학과',
+        'code': 'IB',
+        'url': 'https://ibattery.inha.ac.kr/ibattery/16267/subview.do',
+        'vendor_id': 23
+    },
+
+    {
+        'type': 'A',
+        'name': '자연과학대학',
+        'code': 'INS',
+        'url': 'https://nscollege.inha.ac.kr/nscollege/3340/subview.do',
+        'vendor_id': 24
+    },
+
+    {
+        'type': 'A',
+        'name': '수학과',
+        'code': 'MTH',
+        'url': 'https://math.inha.ac.kr/math/3528/subview.do',
+        'vendor_id': 25
+    },
+
+    {
+        'type': 'A',
+        'name': '수학과',
+        'code': 'MTH',
+        'url': 'https://math.inha.ac.kr/math/3529/subview.do',
+        'vendor_id': 25
+    },
+
+    {
+        'type': 'A',
+        'name': '통계학과',
+        'code': 'STS',
+        'url': 'https://statistics.inha.ac.kr/statistics/3383/subview.do',
+        'vendor_id': 26
+    },
+
+    {
+        'type': 'A',
+        'name': '통계학과',
+        'code': 'STS',
+        'url': 'https://statistics.inha.ac.kr/statistics/3885/subview.do',
+        'vendor_id': 26
+    },
+
+    {
+        'type': 'A',
+        'name': '통계학과',
+        'code': 'STS',
+        'url': 'https://statistics.inha.ac.kr/statistics/3402/subview.do',
+        'vendor_id': 26
+    },
+
+    {
+        'type': 'A',
+        'name': '물리학과',
+        'code': 'PHY',
+        'url': 'https://physics.inha.ac.kr/physics/3908/subview.do',
+        'vendor_id': 27
+    },
+
+    {
+        'type': 'A',
+        'name': '화학학과',
+        'code': 'CHM',
+        'url': 'https://chemistry.inha.ac.kr/chemistry/3297/subview.do',
+        'vendor_id': 28
+    },
+
+    {
+        'type': 'A',
+        'name': '해양과학과',
+        'code': 'OCN',
+        'url': 'https://ocean.inha.ac.kr/ocean/17547/subview.do',
+        'vendor_id': 29
+    },
+
+   {
+        'type': 'A',
+        'name': '해양과학과',
+        'code': 'OCN',
+        'url': 'https://ocean.inha.ac.kr/ocean/17548/subview.do',
+        'vendor_id': 29
+    },
+
+    {
+        'type': 'A',
+        'name': '해양과학과',
+        'code': 'OCN',
+        'url': 'https://ocean.inha.ac.kr/ocean/17549/subview.do',
+        'vendor_id': 29
+    },
+
+    {
+        'type': 'A',
+        'name': '해양과학과',
+        'code': 'OCN',
+        'url': 'https://ocean.inha.ac.kr/ocean/17550/subview.do',
+        'vendor_id': 29
+    },
+
+    {
+        'type': 'A',
+        'name': '식품영양학과',
+        'code': 'IFN',
+        'url': 'https://foodnutri.inha.ac.kr/foodnutri/3555/subview.do',
+        'vendor_id': 30
+    },
+
+    {
+        'type': 'A',
+        'name': '바이오시스템융합학부',
+        'code': 'BIO',
+        'url': 'https://biosyst.inha.ac.kr/biosyst/14989/subview.do',
+        'vendor_id': 31
+    },
+
+    {
+        'type': 'A',
+        'name': '생명공학과',
+        'code': 'IBE',
+        'url': 'https://bio.inha.ac.kr/bio/2346/subview.do',
+        'vendor_id': 32
+    },
+
+    {
+        'type': 'A',
+        'name': '생명공학과',
+        'code': 'IBE',
+        'url': 'https://bio.inha.ac.kr/bio/2347/subview.do',
+        'vendor_id': 32
+    },
+
+    {
+        'type': 'A',
+        'name': '바이오제약공학과',
+        'code': 'BPH',
+        'url': 'https://biopharm.inha.ac.kr/biopharm/10309/subview.do',
+        'vendor_id': 33
+    },
+
+    {
+        'type': 'A',
+        'name': '생명과학과',
+        'code': 'IBG',
+        'url': 'https://biology.inha.ac.kr/biology/3685/subview.do',
+        'vendor_id': 34
+    },
+
+    {
+        'type': 'A',
+        'name': '생명과학과',
+        'code': 'IBG',
+        'url': 'https://biology.inha.ac.kr/biology/3689/subview.do',
+        'vendor_id': 34
+    },
+
+    {
+        'type': 'A',
+        'name': '첨단바이오의약학과',
+        'code': 'BMD',
+        'url': 'https://biomedical.inha.ac.kr/biomedical/16160/subview.do',
+        'vendor_id': 35
+    },
+
 
 
 
@@ -314,18 +483,18 @@ SITES = [
     # === TYPE B (오전 12시 실행 그룹) ===
     {
         'type': 'B',
-        'name': 'Inha_Ibattery_Announcement',
-        'code': 'IBA',
+        'name': '이차전지공학(융합전공)',
+        'code': 'IBF',
         'url': 'http://ibattery.website.ne.kr/sub/sub04_01.php',
-        'vendor_id': 23
+        'vendor_id': 36
     },
 
     {
         'type': 'B',
-        'name': 'Inha_Ibattery_Event',
-        'code': 'IBE',
+        'name': '이차전지공학(융합전공)',
+        'code': 'IBF',
         'url': 'http://ibattery.website.ne.kr/sub/sub04_02.php',
-        'vendor_id': 23
+        'vendor_id': 36
     },
 
 
@@ -335,41 +504,16 @@ SITES = [
     # === TYPE C (오전 12시 실행 그룹) ===
     {
         'type': 'C',
-        'name': 'Inha_FVT',
-        'code': 'FVT',
-        'url': 'http://fvt.inha.ac.kr/fvt/board/5',
-        'vendor_id': 24
+        'name': 'Inha_SE',
+        'code': 'SEF',
+        'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01',
+        'vendor_id': 37
     },
 
 
 
     # ... C타입 사이트 1개 ...
 
-    # === TYPE D (오전 12시 실행 그룹) ===
-    {
-        'type': 'D',
-        'name': 'Inha_SE',
-        'code': 'SEE',
-        'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01',
-        'vendor_id': 25
-    },
-
-
-
-    # ... D타입 사이트 1개 ...
-
-    # === TYPE E (오전 12시 실행 그룹) ===
-    {
-        'type': 'E',
-        'name': 'Inha_JOB',
-        'code': 'JOB',
-        'url': 'https://job.inha.ac.kr/Community/Program/ProgramList.aspx',
-        'vendor_id': 26
-    }
-
-
-
-    # ... E타입 사이트 2개 ...
 ]
 
 # 6. 크롤링 결과 JSON으로 저장
