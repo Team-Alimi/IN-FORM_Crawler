@@ -1,58 +1,80 @@
 name: Crawler CI/CD
 
-# 트리거: 'crawler' 브랜치에 코드가 푸시되면 실행
 on:
   push:
     branches: [ "crawler" ]
 
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/team-alimi/inform-crawler:latest
+  CONTAINER_NAME: inform-crawler
+
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest  # 깃허브의 가상 컴퓨터(Ubuntu) 사용
+    runs-on: ubuntu-latest
 
     steps:
-    # 1. 저장소에서 코드 내려받기
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # 2. Docker Hub 로그인 (Secrets 사용)
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
+    - name: Lowercase Image Name
+      run: |
+        echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-    # 3. 도커 이미지 빌드 및 푸시 (Build & Push)
     - name: Build and push Docker image
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
-        context: .              # Dockerfile이 있는 경로 (루트 기준)
-        push: true              # 빌드 후 즉시 업로드
-        tags: ${{ secrets.DOCKER_USERNAME }}/inform-crawler:latest
-        # Github Actions는 매번 새로운 환경에서 실행되므로 no-cache 옵션이 없어도 항상 깨끗하게 빌드됩니다.
+        context: .
+        push: true
+        tags: ${{ env.IMAGE_NAME }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
-    # 4. Azure VM에 접속하여 배포 명령 실행 (SSH)
-    - name: Deploy to Azure VM
-      uses: appleboy/ssh-action@master
+    - name: Deploy to GCP VM
+      uses: appleboy/ssh-action@v1.0.3
       with:
-        host: ${{ secrets.HOST_IP }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_KEY }}
+        host: ${{ secrets.HOST_IP }}        # GCP 서버 IP
+        username: ${{ secrets.SSH_USER }}   # GCP 서버 계정명 (예: ubuntu)
+        key: ${{ secrets.SSH_KEY }}         # SSH Private Key
+        port: 22
+        envs: IMAGE_NAME
         script: |
+          # 1. 환경변수 파일(.env) 갱신
           echo "[1/3] 최신 환경변수 파일(.env) 생성 중..."
           
-          rm -f /home/Alimi/crawler/.env 
-          echo "DB_HOST=${{ secrets.DB_HOST }}" > /home/Alimi/crawler/.env
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> /home/Alimi/crawler/.env
-          echo "DB_USER=root" >> /home/Alimi/crawler/.env
-          echo "DB_NAME=informserver" >> /home/Alimi/crawler/.env
-          echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> /home/Alimi/crawler/.env
-          echo 'GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}' >> /home/Alimi/crawler/.env
+          # 작업 디렉토리 생성 (없으면)
+          mkdir -p /home/${{ secrets.SSH_USER }}/crawler
+          ENV_PATH="/home/${{ secrets.SSH_USER }}/crawler/.env"
           
-          chmod 600 /home/Alimi/crawler/.env
+          rm -f $ENV_PATH
+          echo "DB_HOST=${{ secrets.DB_HOST }}" > $ENV_PATH
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $ENV_PATH
+          echo "DB_USER=root" >> $ENV_PATH
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $ENV_PATH
+          echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> $ENV_PATH
+          echo 'UPSTAGE_AI_API_KEY=${{ secrets.UPSTAGE_AI_API_KEY }}' >> $ENV_PATH
           
-          echo "[2/3] Docker Hub에서 최신 이미지 당겨오기..."
-          docker pull ${{ secrets.DOCKER_USERNAME }}/inform-crawler:latest
+          chmod 600 $ENV_PATH
           
+          # 2. 서버에서 GHCR 로그인
+          echo "[2/3] GHCR 로그인 중..."
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # 3. 최신 이미지 다운로드
+          echo "[3/3] 최신 이미지 당겨오기..."
+          docker pull ${{ env.IMAGE_NAME }}
+              
+          # 미사용 이미지 정리
           docker image prune -f
           
-          echo "[3/3] 배포 및 설정 갱신 완료!"
+          echo "✅ 업데이트 완료!"
