@@ -1,7 +1,7 @@
-selenium
-webdriver-manager
-beautifulsoup4
+playwright
+scrapy
+scrapy-playwright
 pymysql
 python-dateutil
 cryptography
-google-generativeai
+openai

@@ -12,10 +12,22 @@ DB_CONFIG = {
     'cursorclass': pymysql.cursors.DictCursor
 }
 
-# 2. Gemini API KEY 로드
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+# 2. User-Agent Header
+BASE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+BOT_INFO = "informBot/1.0 (+https://github.com/Team-Alimi; team.alimi.inform@gmail.com)"
+FINAL_USER_AGENT = f"{BASE_USER_AGENT} {BOT_INFO}"
 
-# 3. Gemini API 학습용 가이드
+COMMON_HEADERS = {
+    "User-Agent": FINAL_USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Upgrade-Insecure-Requests": "1"
+}
+
+# 2. UPSTAGE API KEY 로드
+UPSTAGE_AI_API_KEY = os.getenv('UPSTAGE_AI_API_KEY', '')
+
+# 3. UPSTAGE AI API 학습용 가이드
 CATEGORY_GUIDE = {
     # [0: Exclude]
     0: "Delete/Ignore (단순 학사 행정, 졸업, 예비군, 수강신청, 시스템 점검 등 학생 모집과 무관한 공지)",
@@ -504,7 +516,7 @@ SITES = [
     # === TYPE C (오전 12시 실행 그룹) ===
     {
         'type': 'C',
-        'name': 'Inha_SE',
+        'name': '반도체공학(융합전공)',
         'code': 'SEF',
         'url': 'http://a221688b1.10pages.co.kr/board/list?bd_id=info01',
         'vendor_id': 37
