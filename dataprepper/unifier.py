@@ -1,106 +1,105 @@
 import json
 import os
 import hashlib
+from datetime import datetime
 from config import HISTORY_DIR
 from common.logger import log_status
+from common.utils import format_date_str
 
-class DataUnifier:
-    """수집 데이터를 통합하고 신규/수정을 분류하는 모듈"""
+class Unifier:
+    """수집 데이터 통합 및 신규/수정 분류"""
 
     def __init__(self):
-        self.global_hash_path = os.path.join(HISTORY_DIR, "GLOBAL_CONTENT_HASH.json")
-        self.global_metadata = self._load_global_metadata()
+        self.meta_path = os.path.join(HISTORY_DIR, "GLOBAL_CONTENT_HASH.json")
+        self.meta = self._load_meta()
 
-    def _load_global_metadata(self):
+    def _load_meta(self):
         """글로벌 지문 정보 로딩"""
-        if not os.path.exists(self.global_hash_path): return {}
+        if not os.path.exists(self.meta_path): return {}
         try:
-            with open(self.global_hash_path, 'r', encoding='utf-8') as f:
+            with open(self.meta_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except: return {}
 
-    def _save_global_metadata(self):
+    def _save_meta(self):
         """글로벌 지문 정보 저장"""
-        with open(self.global_hash_path, 'w', encoding='utf-8') as f:
-            json.dump(self.global_metadata, f, ensure_ascii=False, indent=4)
+        with open(self.meta_path, 'w', encoding='utf-8') as f:
+            json.dump(self.meta, f, ensure_ascii=False, indent=4)
 
-    def _make_article_fingerprint(self, article):
-        """본문 또는 이미지 기반 지문 생성"""
-        content = article.get('content', '').strip()
-        attachments = article.get('attachments', [])
-        if content:
-            clean_text = "".join(content.split())
-            return hashlib.md5(clean_text.encode('utf-8')).hexdigest()
-        elif attachments:
-            urls = sorted([str(a.get('attachment_url', '')) for a in attachments if a.get('attachment_url')])
-            if not urls: return None
-            return hashlib.md5("".join(urls).encode('utf-8')).hexdigest()
+    def _make_fp(self, article):
+        """본문/이미지 기반 지문 생성"""
+        cnt, att = article.get('content', '').strip(), article.get('attachments', [])
+        if cnt:
+            return hashlib.md5("".join(cnt.split()).encode('utf-8')).hexdigest()
+        if att:
+            urls = sorted([str(x.get('attachment_url', '')) for x in att if x.get('attachment_url')])
+            if urls: return hashlib.md5("".join(urls).encode('utf-8')).hexdigest()
         return None
 
-    def _merge_vendor_info(self, ids1, urls1, ids2, urls2):
-        """두 그룹의 vendor 정보를 병합하여 정렬된 배열로 반환"""
-        merged = dict(zip(map(str, ids1), urls1))
-        merged.update(dict(zip(map(str, ids2), urls2)))
-        sorted_ids = sorted([int(k) for k in merged.keys()])
-        sorted_urls = [merged[str(k)] for k in sorted_ids]
-        return sorted_ids, sorted_urls
+    def _merge(self, ids1, urls1, ids2, urls2):
+        """출처 정보 병합"""
+        m = dict(zip(map(str, ids1), urls1))
+        m.update(dict(zip(map(str, ids2), urls2)))
+        s_ids = sorted([int(k) for k in m.keys()])
+        return s_ids, [m[str(k)] for k in s_ids]
 
-    def unify_collected_articles(self, article_list):
+    def unify(self, articles):
         """데이터 통합 및 분류 수행"""
         from .deduplicate import HistoryManager
-        managers = {}
+        hist_mgrs = {}
         
-        fingerprint_groups = {}
-        for article in article_list:
-            fp = self._make_article_fingerprint(article)
+        groups = {}
+        for a in articles:
+            fp = self._make_fp(a)
             if not fp: continue
-            if fp not in fingerprint_groups: fingerprint_groups[fp] = []
-            fingerprint_groups[fp].append(article)
+            if fp not in groups: groups[fp] = []
+            groups[fp].append(a)
 
-        final_inserts, final_updates = [], []
-        global_changed = False
+        inserts, updates = [], []
+        changed = False
 
-        for fp, group in fingerprint_groups.items():
-            temp_map = {}
-            for art in group:
-                vid, url = str(art.get('vendor_id')), art.get('original_url')
-                if vid and url: temp_map[vid] = url
+        for fp, group in groups.items():
+            tmp = {}
+            for a in group:
+                vid, url = str(a.get('vendor_id')), a.get('original_url')
+                if vid and url: tmp[vid] = url
             
-            curr_ids = sorted([int(v) for v in temp_map.keys()])
-            curr_urls = [temp_map[str(v)] for v in curr_ids]
-            representative = group[0]
-            is_globally_new = fp not in self.global_metadata
-            has_local_update = False
+            c_ids = sorted([int(v) for v in tmp.keys()])
+            c_urls = [tmp[str(v)] for v in c_ids]
+            rep = group[0]
+            is_new_fp = fp not in self.meta
+            is_upd = False
 
-            for art in group:
-                site_name = art.get('site_name', 'Unknown')
-                if site_name not in managers: managers[site_name] = HistoryManager(site_name)
-                _, is_updated, old_art = managers[site_name].compare_with_history(art)
-                if is_updated:
-                    has_local_update = True
-                    curr_ids, curr_urls = self._merge_vendor_info(curr_ids, curr_urls, old_art.get('vendor_ids', []), old_art.get('vendor_urls', []))
-                managers[site_name].update_local_history(art)
+            for a in group:
+                sn = a.get('site_name', 'Unknown')
+                if sn not in hist_mgrs: hist_mgrs[sn] = HistoryManager(sn)
+                _, up, old = hist_mgrs[sn].check(a)
+                if up:
+                    is_upd = True
+                    rep['updated_at'] = format_date_str(datetime.now())
+                    c_ids, c_urls = self._merge(c_ids, c_urls, old.get('vendor_ids', []), old.get('vendor_urls', []))
+                hist_mgrs[sn].update(a)
 
-            representative['vendor_ids'], representative['vendor_urls'] = curr_ids, curr_urls
-            representative.pop('vendor_id', None); representative.pop('site_name', None)
+            rep['vendor_ids'], rep['vendor_urls'] = c_ids, c_urls
+            rep.pop('vendor_id', None); rep.pop('site_name', None)
 
-            if has_local_update:
-                final_updates.append(representative)
-            elif is_globally_new:
-                final_inserts.append(representative)
-                self.global_metadata[fp] = {'vendor_ids': curr_ids, 'vendor_urls': curr_urls, 'title': representative['title'], 'unique_id': representative['unique_id']}
-                global_changed = True
+            if is_upd:
+                updates.append(rep)
+                log_status("Unifier", f"수정 감지: {rep['title'][:15]}...", "LINK")
+            elif is_new_fp:
+                inserts.append(rep)
+                self.meta[fp] = {'vendor_ids': c_ids, 'vendor_urls': c_urls, 'title': rep['title'], 'unique_id': rep['unique_id']}
+                changed = True
             else:
-                existing = self.global_metadata[fp]
-                old_ids, old_urls = existing.get('vendor_ids', []), existing.get('vendor_urls', [])
-                new_ids, new_urls = self._merge_vendor_info(curr_ids, curr_urls, old_ids, old_urls)
-                if len(new_ids) > len(old_ids):
-                    existing['vendor_ids'], existing['vendor_urls'] = new_ids, new_urls
-                    representative['vendor_ids'], representative['vendor_urls'] = new_ids, new_urls
-                    final_inserts.append(representative)
-                    global_changed = True
-                    log_status("Unifier", f"내용 통합 완료: {representative['title'][:15]}... (IDs: {new_ids})", "LINK")
+                ext = self.meta[fp]
+                o_ids, o_urls = ext.get('vendor_ids', []), ext.get('vendor_urls', [])
+                n_ids, n_urls = self._merge(c_ids, c_urls, o_ids, o_urls)
+                if len(n_ids) > len(o_ids):
+                    ext['vendor_ids'], ext['vendor_urls'] = n_ids, n_urls
+                    rep['vendor_ids'], rep['vendor_urls'] = n_ids, n_urls
+                    inserts.append(rep); changed = True
+                    log_status("Unifier", f"통합 완료: {rep['title'][:15]}...", "LINK")
 
-        if global_changed: self._save_global_metadata()
-        for m in managers.values(): m.sync_history_file()
-        return final_inserts, final_updates
+        if changed: self._save_meta()
+        for m in hist_mgrs.values(): m.save()
+        return inserts, updates

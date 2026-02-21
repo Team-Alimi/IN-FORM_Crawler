@@ -4,16 +4,15 @@ from dateutil.relativedelta import relativedelta
 from config import KEYWORD_CATEGORIES
 
 def get_limit_date():
-    """n개월 전 1일 날짜 반환 (시간 00:00:00)"""
+    """수집 기한(2개월 전) 반환"""
     now = datetime.now()
-    limit = now - relativedelta(months=2) # 2개월 전
+    limit = now - relativedelta(months=24)
     return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 def parse_date_raw(date_text):
-    """문자열 날짜를 datetime 객체로 변환"""
+    """문자열 날짜를 객체로 변환"""
     if not date_text: return None
     date_text = date_text.strip()
-
     formats = ['%Y.%m.%d', '%Y-%m-%d', '%Y.%m.%d %H:%M', '%Y/%m/%d']
     for fmt in formats:
         try:
@@ -23,23 +22,31 @@ def parse_date_raw(date_text):
     return None
 
 def format_date_str(date_obj):
-    """datetime 객체를 YYYY-MM-DD 문자열로 변환"""
+    """날짜를 문자열로 변환"""
     if date_obj is None: return None
     return date_obj.strftime("%Y-%m-%d")
 
-def match_category(title_text):
-    """제목 기반 카테고리 분류 (제외 키워드 우선 체크)"""
-    if not title_text: return None
-    title_lower = title_text.lower()
-
-    # 1. 제외 키워드 체크
+def is_excluded(title):
+    """제외 키워드 포함 여부 확인"""
+    if not title: return True
+    title_low = title.lower()
     for ex_kw in KEYWORD_CATEGORIES.get(0, []):
-        if ex_kw and ex_kw.strip().lower() in title_lower: return None
+        if ex_kw and ex_kw.strip().lower() in title_low: return True
+    return False
 
-    # 2. 카테고리 매칭
-    for cat_id, keywords in KEYWORD_CATEGORIES.items():
-        if cat_id == 0: continue
-        for kw in keywords:
-            if kw and kw.strip().lower() in title_lower: return cat_id
+def process_article(article):
+    """게시글 정제 및 제외 키워드 검증 (순환 참조 방지를 위해 내부 임포트)"""
+    if is_excluded(article.get('title', '')): return None
 
-    return None
+    # Cleaner 임포트를 함수 내부로 이동하여 순환 참조 해결
+    from dataprepper.text_cleaner import Cleaner
+    cleaner = Cleaner()
+    
+    if article.get('content'):
+        article['content'] = cleaner.clean_contents_text(article['content'])
+    
+    if not all(article.get(f) for f in ['unique_id', 'title', 'original_url']):
+        return None
+    if not article.get('content') and not article.get('attachments'):
+        return None
+    return article

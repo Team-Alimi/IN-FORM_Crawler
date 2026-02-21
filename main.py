@@ -8,82 +8,80 @@ from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler
 from common.logger import log_status
 
-async def launch_crawler(site_info):
-    """사이트 타입에 맞는 크롤러 실행"""
-    if site_info['type'] == 'A': crawler = TypeACrawler(site_info)
-    elif site_info['type'] == 'B': crawler = TypeBCrawler(site_info)
-    elif site_info['type'] == 'C': crawler = TypeCCrawler(site_info)
-    else: return site_info['name'], []
-    return await crawler.run()
+async def run_crawler(site):
+    """사이트 타입별 크롤러 실행"""
+    if site['type'] == 'A': c = TypeACrawler(site)
+    elif site['type'] == 'B': c = TypeBCrawler(site)
+    elif site['type'] == 'C': c = TypeCCrawler(site)
+    else: return site['name'], []
+    return await c.run()
 
-def export_articles_to_json(article_list, filename):
-    """수집 데이터를 JSON으로 저장하거나 데이터가 없으면 기존 파일 삭제"""
+def save_json(data, name):
+    """결과 저장"""
     os.makedirs(QUEUE_DIR, exist_ok=True)
-    file_path = os.path.join(QUEUE_DIR, filename)
-
-    if article_list:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(article_list, f, ensure_ascii=False, indent=4)
-        log_status("System", f"데이터 저장 완료: {filename} ({len(article_list)}건)", "SAVE")
-    else:
-        if os.path.exists(file_path):
-            try: os.remove(file_path)
-            except: pass
+    path = os.path.join(QUEUE_DIR, name)
+    if data:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        log_status("System", f"저장 완료: {name} ({len(data)}건)", "SAVE")
+    elif os.path.exists(path):
+        try: os.remove(path)
+        except: pass
 
 async def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--type', required=True, help="크롤러 타입 (A, B, C...)")
-    args = parser.parse_args()
-    target_type = args.type.upper()
+    p = argparse.ArgumentParser()
+    p.add_argument('--type', required=True)
+    args = p.parse_args()
+    typ = args.type.upper()
 
-    log_status("System", f"{target_type} 타입 크롤러 시작", "START")
-
-    target_sites = [s for s in SITES if s['type'] == target_type]
-    if not target_sites:
-        log_status("System", f"설정된 사이트 없음: {target_type}", "ERROR")
-        sys.exit(1)
+    log_status("System", f"{typ} 타입 시작", "START")
+    targets = [s for s in SITES if s['type'] == typ]
+    if not targets:
+        log_status("System", f"대상 없음: {typ}", "ERROR"); sys.exit(1)
 
     # === PHASE 1: 비동기 크롤링 수행 ===
-    max_workers = min(len(target_sites), 8)
-    sem = asyncio.Semaphore(max_workers)
+    sem = asyncio.Semaphore(min(len(targets), 8))
+    async def run_with_sem(s):
+        async with sem: return await run_crawler(s)
 
-    async def run_with_sem(site):
-        async with sem: return await launch_crawler(site)
+    results = await asyncio.gather(*[run_with_sem(s) for s in targets], return_exceptions=True)
 
-    tasks = [run_with_sem(site) for site in target_sites]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    raw_data_map = {}
+    raw_map = {}
     for res in results:
         if isinstance(res, Exception): continue
-        site_name, collected_articles = res
-        if collected_articles:
-            if site_name not in raw_data_map: raw_data_map[site_name] = []
-            raw_data_map[site_name].extend(collected_articles)
+        name, data = res
+        if data:
+            if name not in raw_map: raw_map[name] = []
+            raw_map[name].extend(data)
 
     # === PHASE 2: 데이터 통합 및 신규/수정 분류 ===
-    log_status("System", "데이터 통합 및 분류 시작", "PHASE")
-
+    log_status("System", "데이터 통합 시작", "PHASE")
     all_articles = []
-    for site_name, article_list in raw_data_map.items():
-        for article in article_list:
-            article['site_name'] = site_name
-            all_articles.append(article)
+    for name, items in raw_map.items():
+        for a in items:
+            a['site_name'] = name
+            all_articles.append(a)
 
     if all_articles:
-        from dataprepper.unifier import DataUnifier
-        unifier = DataUnifier()
-        final_inserts, final_updates = unifier.unify_collected_articles(all_articles)
+        from dataprepper.unifier import Unifier
+        inserts, updates = Unifier().unify(all_articles)
     else:
-        final_inserts, final_updates = [], []
+        inserts, updates = [], []
 
-    log_status("System", f"결과: 신규(INSERT) {len(final_inserts)}건 / 수정(UPDATE) {len(final_updates)}건", "SUCCESS")
+    # === PHASE 3: AI 기반 분류 및 날짜 추출 ===
+    if inserts or updates:
+        log_status("System", "AI 전처리 시작", "PHASE")
+        from dataprepper.ai_engine.base import AI
+        ai = AI()
+        if inserts: inserts = ai.process(inserts)
+        if updates: updates = ai.process(updates)
 
-    # 결과물 저장
-    export_articles_to_json(final_inserts, "INSERT_DATA.json")
-    export_articles_to_json(final_updates, "UPDATE_DATA.json")
-
-    log_status("System", "모든 작업 완료", "DONE")
+    # === PHASE 4: 최종 결과 JSON 저장 ===
+    log_status("System", f"결과: 신규 {len(inserts)} / 수정 {len(updates)}", "SUCCESS")
+    save_json(inserts, "INSERT_DATA.json")
+    save_json(updates, "UPDATE_DATA.json")
+    
+    log_status("System", "작업 완료", "DONE")
 
 if __name__ == "__main__":
     asyncio.run(main())
