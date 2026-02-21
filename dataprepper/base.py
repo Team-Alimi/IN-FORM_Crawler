@@ -1,9 +1,9 @@
-import google.generativeai as genai
+from openai import OpenAI
 import json
 import re
 import time
 from datetime import datetime
-from config import GEMINI_API_KEY
+from config import UPSTAGE_AI_API_KEY
 
 from .classifier import ClassificationRules
 from .date_extractor import DateExtractionRules
@@ -11,27 +11,30 @@ from .date_extractor import DateExtractionRules
 
 class AIProcessor:
     def __init__(self):
-        if not GEMINI_API_KEY:
+        if not UPSTAGE_AI_API_KEY:
             print("⚠️ [AI] API Key가 설정되지 않았습니다.")
-            self.model = None
+            self.client = None
             return
 
-        genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.client = OpenAI(
+            api_key=UPSTAGE_AI_API_KEY,
+            base_url="https://api.upstage.ai/v3"
+        )
+        self.model_name = "solar-pro"
 
     def process_batch(self, article_list):
         """
         리스트를 받아 [분류 + 날짜추출]을 동시에 수행하고 업데이트된 리스트 반환
         """
-        if not self.model: return article_list
+        if not self.client: return article_list
 
-        print(f"   🚀 [AI] 통합 분석 시작 ({len(article_list)}건) - Gemini 2.5 Flash")
+        print(f"   🚀 [AI] 통합 분석 시작 ({len(article_list)}건) - Upstage Solar")
 
         for article in article_list:
             self._analyze_single_article(article)
 
-            # Rate Limit 방지 안전하게 4초 대기 (분당 15회 제한)
-            time.sleep(4)
+            # Rate Limit 방지 안전하게 1초 대기 (Upstage Limit에 따라 조정)
+            time.sleep(1)
 
         return article_list
 
@@ -69,9 +72,24 @@ class AIProcessor:
         """
 
         try:
-            # API 호출 (1회)
-            response = self.model.generate_content(full_prompt)
-            result_text = response.text.strip()
+            # API 호출 (OpenAI Compatible)
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that outputs JSON only."
+                    },
+                    {
+                        "role": "user",
+                        "content": full_prompt
+                    }
+                ],
+                temperature=0, # 정형화된 출력을 위해 0으로 설정
+                response_format={"type": "json_object"} # JSON 모드 활성화 (지원 모델인 경우)
+            )
+            
+            result_text = response.choices[0].message.content.strip()
 
             # JSON 파싱 전처리
             result_text = re.sub(r"^```json|^```", "", result_text).strip()

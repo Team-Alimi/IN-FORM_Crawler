@@ -9,3 +9,10 @@ class InformItem(scrapy.Item):
     updated_at = scrapy.Field()
     vendor_id = scrapy.Field()
     category_id = scrapy.Field()
+    
+    # 추가 메타데이터
+    site_name = scrapy.Field()
+    site_code = scrapy.Field()
+    
+    # 첨부 파일 (이미지 URL 등)
+    attachments = scrapy.Field()
