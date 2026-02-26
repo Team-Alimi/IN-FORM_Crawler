@@ -1,6 +1,7 @@
 import scrapy
 
-class InformItem(scrapy.Item):
+class InformArticle(scrapy.Item):
+    """스크래피 크롤링 데이터 구조"""
     unique_id = scrapy.Field()
     title = scrapy.Field()
     content = scrapy.Field()

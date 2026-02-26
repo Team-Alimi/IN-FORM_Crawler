@@ -37,14 +37,14 @@ class Unifier:
         return None
 
     def _merge(self, ids1, urls1, ids2, urls2):
-        """출처 정보 병합"""
+        """다중 출처 정보를 병합하여 동일 게시글에 대한 접근 경로의 가용성을 극대화함"""
         m = dict(zip(map(str, ids1), urls1))
         m.update(dict(zip(map(str, ids2), urls2)))
         s_ids = sorted([int(k) for k in m.keys()])
         return s_ids, [m[str(k)] for k in s_ids]
 
     def unify(self, articles):
-        """데이터 통합 및 분류 수행"""
+        """본문/이미지 지문 분석을 통해 중복 수집을 방지하고 통합된 게시글 정보를 생성함"""
         from .deduplicate import HistoryManager
         hist_mgrs = {}
         

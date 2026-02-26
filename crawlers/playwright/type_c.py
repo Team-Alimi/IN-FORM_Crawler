@@ -1,14 +1,11 @@
-import re
-import asyncio
-from datetime import datetime
 from .base import BaseCrawler
 from common.utils import parse_date_raw, format_date_str
 
 class TypeCCrawler(BaseCrawler):
-    """다중 탭 게시판 크롤러"""
+    """카테고리 탭이 분리된 게시판(Type C)을 위한 Playwright 크롤러 구현체"""
 
     async def parse_list(self):
-        """목록 페이지 순회"""
+        """지정된 카테고리 탭들을 순회하며 각 목록 페이지를 파싱"""
         self.log(f"수집 시작 (기한: {self.limit.strftime('%Y-%m-%d')})", "START")
         for tid in [1, 3, 4]:
             self.log(f"Tab {tid} 진입...", "START")
@@ -67,7 +64,7 @@ class TypeCCrawler(BaseCrawler):
                 if p_num > 100: break
 
     async def parse_detail(self, title, dt_obj, tid, uid_txt):
-        """상세 정보 추출"""
+        """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
         loc = self.page.locator('.contents_wrap, .artclView')
         if await loc.count() == 0: return
         cnt = (await loc.first.inner_text()).strip()

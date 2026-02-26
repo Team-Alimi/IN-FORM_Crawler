@@ -1,13 +1,12 @@
 import re
-import asyncio
-from datetime import datetime
 from .base import BaseCrawler
 from common.utils import parse_date_raw, format_date_str
 
 class TypeBCrawler(BaseCrawler):
-    """동적 목록형 크롤러"""
+    """동적 웹 페이지(Type B)를 위한 Playwright 크롤러 구현체"""
 
     async def parse_list(self):
+        """무한 스크롤 또는 오프셋 기반의 목록 페이지를 순회하며 상세 페이지로 진입"""
         self.log(f"수집 시작 (기한: {self.limit.strftime('%Y-%m-%d')})", "START")
         off, streak = 0, 0
         while True:
@@ -65,7 +64,7 @@ class TypeBCrawler(BaseCrawler):
             if off > 5000: break
 
     async def parse_detail(self, title, dt_obj, uid):
-        """상세 정보 추출"""
+        """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
         loc = self.page.locator('.board-view-cnt')
         if await loc.count() == 0: return
         cnt = (await loc.first.inner_text()).strip()

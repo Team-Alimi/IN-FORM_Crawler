@@ -10,16 +10,16 @@ class HistoryManager:
         self.data = self._load()
 
     def _load(self):
-        """파일 로딩"""
+        """히스토리 파일 로드 및 사전 변환"""
         if not os.path.exists(self.path): return {}
         try:
             with open(self.path, 'r', encoding='utf-8') as f:
-                items = json.load(f)
-            return {a['unique_id']: a for a in items if 'unique_id' in a}
+                articles = json.load(f)
+            return {a['unique_id']: a for a in articles if 'unique_id' in a}
         except: return {}
 
     def check(self, article):
-        """기존 데이터와 비교하여 변경 여부 확인"""
+        """기존 데이터와의 비교를 통해 신규/변경 여부 판별"""
         uid = article.get('unique_id')
         if uid not in self.data: return True, False, None
         old = self.data[uid]
@@ -31,11 +31,11 @@ class HistoryManager:
         return False, changed, old
 
     def update(self, article):
-        """메모리 갱신"""
+        """메모리 내 히스토리 데이터 갱신"""
         self.data[article.get('unique_id')] = article
 
     def save(self):
-        """파일 저장 및 정리"""
+        """히스토리 데이터를 파일로 저장 및 정리"""
         out = []
         for a in self.data.values():
             a.pop('vendor_id', None); a.pop('site_name', None)

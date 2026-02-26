@@ -17,7 +17,7 @@ async def run_crawler(site):
     return await c.run()
 
 def save_json(data, name):
-    """결과 저장"""
+    """결과 데이터를 JSON 파일로 저장"""
     os.makedirs(QUEUE_DIR, exist_ok=True)
     path = os.path.join(QUEUE_DIR, name)
     if data:
@@ -29,6 +29,7 @@ def save_json(data, name):
         except: pass
 
 async def main():
+    """메인 실행 프로세스 제어"""
     p = argparse.ArgumentParser()
     p.add_argument('--type', required=True)
     args = p.parse_args()
@@ -57,8 +58,8 @@ async def main():
     # === PHASE 2: 데이터 통합 및 신규/수정 분류 ===
     log_status("System", "데이터 통합 시작", "PHASE")
     all_articles = []
-    for name, items in raw_map.items():
-        for a in items:
+    for name, articles in raw_map.items():
+        for a in articles:
             a['site_name'] = name
             all_articles.append(a)
 

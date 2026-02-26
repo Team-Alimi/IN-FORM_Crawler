@@ -3,15 +3,16 @@ import os
 import re as regex
 import scrapy
 from datetime import datetime
-from crawlers.scrapy_app.items import InformItem
+from crawlers.scrapy_app.items import InformArticle
 from common.utils import get_limit_date, parse_date_raw, format_date_str
 from common.logger import log_status
 
 class TypeASpider(scrapy.Spider):
-    """표준 목록형 스파이더 (Type A)"""
+    """표준 목록 구조를 가진 사이트에서 기한 내 게시글을 효율적으로 추출하는 스파이더"""
     name = 'type_a'
     
     def __init__(self, *args, **kwargs):
+        """환경 변수의 사이트 메타데이터를 로드하고 수집 기한 등 실행 환경을 설정함"""
         super(TypeASpider, self).__init__(*args, **kwargs)
         inf = json.loads(os.environ.get('SCRAPY_SITE_INFO')) if os.environ.get('SCRAPY_SITE_INFO') else None
         if inf:
@@ -22,11 +23,11 @@ class TypeASpider(scrapy.Spider):
         self.limit, self.page, self.streak = get_limit_date(), 1, 0
 
     def log_msg(self, msg, lv="INFO"):
-        """표준 로그 출력"""
+        """프로젝트 공통 로깅 규격에 맞춰 사이트별 작업 진행 상태를 기록함"""
         log_status(self.name, msg, lv)
 
     def parse(self, response):
-        """목록 페이지 파싱"""
+        """목록을 순회하며 기한 초과 시 조기 종료하여 불필요한 네트워크 리소스 낭비를 방지함"""
         self.log_msg(f"Page {self.page} 분석 중...", "INFO")
         tot = int(response.css('._totPage::text').get() or 1000)
         rows = response.css('tbody tr, table tr, tr')
@@ -68,7 +69,7 @@ class TypeASpider(scrapy.Spider):
                 yield scrapy.Request(next_url, callback=self.parse)
 
     def parse_detail(self, response, title, num):
-        """상세 페이지 파싱"""
+        """텍스트 본문과 이미지(포스터 등)를 조합하여 정보의 완전성이 보장된 데이터를 생성함"""
         view = response.css('.artclView')
         if not view: return
         html = view.get()
@@ -92,10 +93,10 @@ class TypeASpider(scrapy.Spider):
                 if '작성일' in dt: c_at = format_date_str(d_obj)
                 elif '수정일' in dt: u_at = format_date_str(d_obj)
 
-        art = InformItem()
-        art['unique_id'], art['title'], art['content'] = f"{self.code}{art_num}", title, cnt
-        art['original_url'], art['created_at'], art['updated_at'] = response.url, c_at, u_at
-        art['vendor_id'], art['site_name'], art['site_code'] = self.vendor_id, self.name, self.code
-        art['attachments'] = att
+        article = InformArticle()
+        article['unique_id'], article['title'], article['content'] = f"{self.code}{art_num}", title, cnt
+        article['original_url'], article['created_at'], article['updated_at'] = response.url, c_at, u_at
+        article['vendor_id'], article['site_name'], article['site_code'] = self.vendor_id, self.name, self.code
+        article['attachments'] = att
         self.log_msg(f"수집 성공: {title[:20]}... ({len(att)} imgs)", "COLLECT")
-        yield art
+        yield article
