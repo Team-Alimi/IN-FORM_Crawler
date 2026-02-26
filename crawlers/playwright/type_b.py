@@ -12,7 +12,7 @@ class TypeBCrawler(BaseCrawler):
         off, streak = 0, 0
         while True:
             url = f"{self.url}?boardid=notice&offset={off}"
-            # 안전한 페이지 이동
+
             if not await self.safe_goto(url): break
             
             try:
@@ -58,7 +58,6 @@ class TypeBCrawler(BaseCrawler):
                     await self.page.wait_for_timeout(2000)
                 except Exception as e:
                     self.log(f"항목 처리 실패: {e}", "WARN")
-                    # 실패 시 현재 목록 페이지로 복구 시도
                     await self.safe_goto(url)
                     await self.page.wait_for_timeout(2000)
 

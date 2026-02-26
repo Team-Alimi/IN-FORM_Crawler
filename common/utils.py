@@ -4,9 +4,9 @@ from dateutil.relativedelta import relativedelta
 from config import KEYWORD_CATEGORIES
 
 def get_limit_date():
-    """수집 기한(2개월 전) 반환"""
+    """수집 기한 반환"""
     now = datetime.now()
-    limit = now - relativedelta(months=24)
+    limit = now - relativedelta(months=12) # 수집 기한 설정
     return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 def parse_date_raw(date_text):
@@ -38,7 +38,6 @@ def process_article(article):
     """게시글 정제 및 제외 키워드 검증 (순환 참조 방지를 위해 내부 임포트)"""
     if is_excluded(article.get('title', '')): return None
 
-    # Cleaner 임포트를 함수 내부로 이동하여 순환 참조 해결
     from dataprepper.text_cleaner import Cleaner
     cleaner = Cleaner()
     

@@ -5,7 +5,7 @@ from .base import BaseCrawler
 from common.utils import parse_date_raw, format_date_str
 
 class TypeCCrawler(BaseCrawler):
-    """다중 탭 게시판 크롤러 (Type C)"""
+    """다중 탭 게시판 크롤러"""
 
     async def parse_list(self):
         """목록 페이지 순회"""

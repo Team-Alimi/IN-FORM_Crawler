@@ -24,10 +24,10 @@ COMMON_HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
-# 2. UPSTAGE API KEY 로드
+# 3. UPSTAGE API KEY 로드
 UPSTAGE_AI_API_KEY = os.getenv('UPSTAGE_AI_API_KEY', '')
 
-# 3. UPSTAGE AI API 학습용 가이드
+# 4. UPSTAGE AI API 학습용 가이드
 CATEGORY_GUIDE = {
     # [0: Exclude]
     0: "Delete/Ignore (단순 학사 행정, 졸업, 예비군, 수강신청, 시스템 점검 등 학생 모집과 무관한 공지)",

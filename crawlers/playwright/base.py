@@ -51,7 +51,7 @@ class BaseCrawler:
             await self.close()
 
     async def close(self):
-        """자원 해제 (오타 수정됨)"""
+        """자원 해제"""
         try:
             if self.ctx: await self.ctx.close()
             if self.browser: await self.browser.close()
