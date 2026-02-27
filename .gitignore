@@ -18,11 +18,17 @@ logs/
 *.log
 crawled_data/
 data/
+GEMINI.md
 
 # --- 가상환경 ---
 venv/
 env/
+.venv/
+.env/
 
 # --- OS 파일 ---
 .DS_Store
 Thumbs.db
+
+# --- 테스트 환경 전용 ---
+docker-compose.yml

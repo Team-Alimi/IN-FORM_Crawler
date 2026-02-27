@@ -24,7 +24,7 @@ INFORM은 인하대학교 학내의 다양한 동아리 정보와 이벤트를 �
 - **Playwright (Type B, C)**: 동적 렌더링(SPA) 및 브라우저 조작이 필요한 사이트 대응
 
 ### 🔹 AI & Processing
-- **Google Gemini 2.5 Flash**: 게시글 내용을 분석하여 카테고리 태깅 및 일정 추출
+- **Upstage Solar Pro 3**: 수집된 게시글의 맥락을 분석하여 카테고리 분류 및 날짜(시작/종료일) 자동 추출
 
 ### 🔹 Infrastructure
 - **Compute**: GCP Compute Engine (Spot Instance)
@@ -35,36 +35,53 @@ INFORM은 인하대학교 학내의 다양한 동아리 정보와 이벤트를 �
 
 ```
 IN-FORM_Crawler/
-├── .github/
-│   └── workflows/
-│       └── crawler_deploy.yml   # GitHub Actions CI/CD 워크플로우 설정
-├── common/                      # 프로젝트 전반에 사용되는 공용 모듈
-│   ├── __init__.py
-│   └── db_injector.py           # 수집된 데이터를 메인 DB로 전송하는 모듈
-├── crawlers/                    # 크롤링 핵심 로직 패키지
-│   ├── playwright/              # Playwright 기반 크롤러 (동적/복잡한 페이지용)
-│   │   ├── __init__.py
+├── .github/ workflows/        # CI/CD 워크플로우
+├── common/                    # 공용 유틸리티 및 데이터베이스 주입 모듈
+│   ├── db_injector.py         # 통합 데이터를 DB 스키마에 맞춰 Bulk Insert/Update
+│   ├── logger.py              # 프로젝트 통합 로깅
+│   └── utils.py               # 수집 기한 필터링 및 날짜 정제 로직
+├── crawlers/                  # 유형별 수집 엔진 (Type A, B, C)
+│   ├── playwright/             # 동적/탭 구조 페이지 대응 (Type B, C)
 │   │   ├── base.py              # Playwright 크롤러 공통 부모 클래스
 │   │   ├── type_b.py            # Type B 사이트 전용 크롤러
 │   │   └── type_c.py            # Type C 사이트 전용 크롤러
-│   └── scrapy_app/              # Scrapy 기반 크롤러 (정적/대량 페이지용)
+│   └── scrapy_app/             # 대량의 정적 목록 페이지 대응 (Type A)
 │       ├── spiders/             # 실제 크롤링 봇(Spider)들이 위치하는 곳
 │       │   ├── __init__.py
 │       │   └── type_a.py        # Type A 사이트 전용 크롤러
 │       ├── __init__.py
 │       ├── items.py             # 수집할 데이터의 구조(DTO) 정의
-│       ├── middlewares.py       # 요청/응답 중간 처리
 │       ├── pipelines.py         # 카테고리 매칭 및 비즈니스 로직 필터링
-│       ├── settings.py          # Scrapy 설정
-│       └── utils.py             # 날짜 포맷 변환 등 순수 유틸리티 함수
-├── config.py                    # 환경 변수 및 전역 설정 관리
-├── Dockerfile                   # Docker 이미지 빌드 명세서
-├── main.py                      # 프로그램 실행 진입점 (Entry Point)
-├── requirements.txt             # Python 의존성 라이브러리 목록
-└── scrapy.cfg                   # Scrapy 프로젝트 식별 및 배포 설정 파일
+│       └── settings.py          # Scrapy 설정
+├── dataprepper/               # 수집 데이터 후처리 및 분석 엔진
+│   ├── ai_engine/              # Solar Pro 3 기반 분류 및 날짜 추출 모듈
+│   │   ├── base.py              # AI 분석 배치 실행 및 API 예외 처리
+│   │   ├── classifier.py        # 비즈니스 로직에 따른 게시글 카테고리 분류 프롬프트
+│   │   └── date_extractor.py    # 자연어 본문에서 시작/종료일을 추출하는 프롬프트
+│   ├── deduplicate.py           # 사이트별 히스토리를 관리하여 기수집 데이터의 중복 처리
+│   ├── text_cleaner.py          # 불필요한 태그 및 공백을 제거하여 텍스트 정규화 강제
+│   └── unifier.py               # 지문 기반 중복 제거 및 다중 출처 통합
+├── config.py                  # API Key 및 사이트 목록 전역 설정
+├── main.py                    # PHASE 1~4 전체 공정 제어 및 실행 (Entry Point)
+└── requirements.txt           # 프로젝트 의존성 목록
 ```
 
-## 🚦 시작하기
+## 🎯 개발 및 데이터 지침
+
+### 1. 데이터 명명 규칙
+- **객체 지칭**: 수집되는 데이터 단위는 항상 `article`로 지칭하며, 고유 ID는 `unique_id`를 사용합니다.
+- **출처 관리**: DB 정합성을 위해 단일 ID 대신 배열 구조를 사용합니다.
+  - `vendor_ids`: 정수형 배열 (예: `[1, 2]`)
+  - `vendor_urls`: 문자열 배열 (예: `["url1", "url2"]`)
+  - *ID 기준 오름차순으로 1:1 매칭 정렬*
+
+### 2. 주석 및 로깅 표준
+- **의도 중심 주석 (Why)**: "코드가 무엇을 하는지"보다 **"왜 이 로직이 필요한지"** 개발자의 의도를 한국어로 작성합니다.
+- **로깅 시스템**: `common/logger.py`를 사용하여 단계별 상태를 가시성 있게 기록합니다. (START, SUCCESS, COLLECT, LINK, PHASE, SAVE, WARN, ERROR, DONE)
+
+### 3. 핵심 수집 로직
+- **기한 필터링**: 리소스 최적화를 위해 **현재 기준 n개월**이 지난 게시글은 수집 대상에서 즉시 제외합니다.
+- **이미지 기반 지문**: 텍스트가 없는 이미지형 게시물도 `attachments` 필드로 수집하며, 이미지 URL을 포함한 Hash로 데이터 중복을 판별합니다.
 
 ### 사전 요구사항 (Prerequisites)
 
@@ -117,8 +134,8 @@ DB_USER=root
 DB_PASSWORD=your_local_password
 DB_NAME=informserver
 
-# Gemini API (게시글 분류용)
-GEMINI_API_KEY=your_api_key_here
+# UPSTAGE AI API (게시글 분류용)
+UPSTAGE_AI_API_KEY=your_api_key_here
 ```
 
 ### 🚀 실행
