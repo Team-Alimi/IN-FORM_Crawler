@@ -73,17 +73,6 @@ jobs:
           # 3. 최신 이미지 다운로드
           echo "[3/4] 최신 이미지 당겨오기..."
           docker pull $IMAGE_NAME
-              
-          # 🚀 4. 기존 컨테이너 중지 및 새 이미지로 실행
-          echo "[4/4] 컨테이너 교체 및 실행..."
-          docker stop $CONTAINER_NAME || true
-          docker rm $CONTAINER_NAME || true
-          
-          docker run -d \
-            --name $CONTAINER_NAME \
-            --env-file $ENV_PATH \
-            --restart unless-stopped \
-            $IMAGE_NAME
           
           # 미사용 이미지 정리
           docker image prune -f
