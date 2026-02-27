@@ -43,13 +43,18 @@ class AI:
                 {"role": "user", "content": user_content}
             ],
             temperature=0,
-            max_tokens=800,
+            max_tokens=1500,
             response_format={"type": "json_object"}
         )
 
         content = resp.choices[0].message.content
         if not content or not content.strip():
             raise ValueError("Empty response")
+
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
 
         match = re.search(r'(\{.*\})', content, re.DOTALL)
         if not match:
@@ -87,17 +92,18 @@ class AI:
         c_at = article.get('created_at', datetime.now().strftime('%Y-%m-%d'))
 
         system_prompt = f"""
-                University Notice Assistant.
+                You are an Expert Data Classifier and Information Extractor specializing in university notices.
                 {ClassificationRules.get_prompt()}
                 {DateExtractionRules.get_prompt(c_at)}
 
                 [CRITICAL INSTRUCTION]
                 1. Extract category_id, start_date, and due_date.
-                2. DO NOT write any reasoning, summary, or extra keys.
+                2. Briefly write your thought process in the 'reasoning' key FIRST.
 
                 [OUTPUT FORMAT & STOP RULE]
-                You MUST return ONLY a valid JSON object with EXACTLY these 3 keys:
+                You MUST return ONLY a valid JSON object with EXACTLY these 4 keys:
                 {{
+                    "reasoning": "<Write 1-2 short sentences explaining classification and date extraction step-by-step>",
                     "category_id": <int 1~4>,
                     "start_date": "<YYYY-MM-DD>" or null,
                     "due_date": "<YYYY-MM-DD>" or null

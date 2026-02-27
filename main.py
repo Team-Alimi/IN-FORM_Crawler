@@ -6,7 +6,8 @@ import asyncio
 
 from config import SITES, QUEUE_DIR
 from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler
-from common.logger import log_status
+from common.logger import log_status, init_logger
+
 
 async def run_crawler(site):
     """사이트 타입별 크롤러 실행"""
@@ -34,6 +35,7 @@ async def main():
     p.add_argument('--type', required=True)
     args = p.parse_args()
     typ = args.type.upper()
+    init_logger(args.type)
 
     log_status("System", f"{typ} 타입 시작", "START")
     targets = [s for s in SITES if s['type'] == typ]
