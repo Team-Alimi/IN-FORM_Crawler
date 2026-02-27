@@ -43,16 +43,14 @@ jobs:
     - name: Deploy to GCP VM
       uses: appleboy/ssh-action@v1.0.3
       with:
-        host: ${{ secrets.HOST_IP }}        # GCP 서버 IP
-        username: ${{ secrets.SSH_USER }}   # GCP 서버 계정명 (예: ubuntu)
-        key: ${{ secrets.SSH_KEY }}         # SSH Private Key
+        host: ${{ secrets.HOST_IP }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
         port: 22
-        envs: IMAGE_NAME
+        envs: IMAGE_NAME, CONTAINER_NAME
         script: |
           # 1. 환경변수 파일(.env) 갱신
-          echo "[1/3] 최신 환경변수 파일(.env) 생성 중..."
-          
-          # 작업 디렉토리 생성 (없으면)
+          echo "[1/4] 최신 환경변수 파일(.env) 생성 중..."
           mkdir -p /home/${{ secrets.SSH_USER }}/crawler
           ENV_PATH="/home/${{ secrets.SSH_USER }}/crawler/.env"
           
@@ -61,20 +59,30 @@ jobs:
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> $ENV_PATH
           echo "DB_USER=root" >> $ENV_PATH
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> $ENV_PATH
-          echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> $ENV_PATH
-          echo 'UPSTAGE_AI_API_KEY=${{ secrets.UPSTAGE_AI_API_KEY }}' >> $ENV_PATH
-          
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $ENV_PATH
+          echo "UPSTAGE_AI_API_KEY=${{ secrets.UPSTAGE_AI_API_KEY }}" >> $ENV_PATH
           chmod 600 $ENV_PATH
           
           # 2. 서버에서 GHCR 로그인
-          echo "[2/3] GHCR 로그인 중..."
+          echo "[2/4] GHCR 로그인 중..."
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
           # 3. 최신 이미지 다운로드
-          echo "[3/3] 최신 이미지 당겨오기..."
-          docker pull ${{ env.IMAGE_NAME }}
+          echo "[3/4] 최신 이미지 당겨오기..."
+          docker pull $IMAGE_NAME
               
+          # 🚀 4. 기존 컨테이너 중지 및 새 이미지로 실행
+          echo "[4/4] 컨테이너 교체 및 실행..."
+          docker stop $CONTAINER_NAME || true
+          docker rm $CONTAINER_NAME || true
+          
+          docker run -d \
+            --name $CONTAINER_NAME \
+            --env-file $ENV_PATH \
+            --restart unless-stopped \
+            $IMAGE_NAME
+          
           # 미사용 이미지 정리
           docker image prune -f
           
-          echo "✅ 업데이트 완료!"
+          echo "✅ 배포 성공!"

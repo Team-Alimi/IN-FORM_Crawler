@@ -24,4 +24,4 @@ RUN playwright install chromium --with-deps
 COPY . .
 
 # 실행 명령어
-# ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["python", "main.py"]
