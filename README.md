@@ -37,7 +37,7 @@ INFORM은 인하대학교 학내의 다양한 동아리 정보와 이벤트를 �
 IN-FORM_Crawler/
 ├── .github/ workflows/        # CI/CD 워크플로우
 ├── common/                    # 공용 유틸리티 및 데이터베이스 주입 모듈
-│   ├── db_injector.py         # 통합 데이터를 DB 스키마에 맞춰 Bulk Insert/Update
+│   ├── db_loader.py           # 통합 데이터를 DB 스키마에 맞춰 Bulk Insert/Update
 │   ├── logger.py              # 프로젝트 통합 로깅
 │   └── utils.py               # 수집 기한 필터링 및 날짜 정제 로직
 ├── crawlers/                  # 유형별 수집 엔진 (Type A, B, C)

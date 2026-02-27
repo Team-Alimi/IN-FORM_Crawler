@@ -5,7 +5,8 @@ from config import KEYWORD_CATEGORIES
 def get_limit_date():
     """과도한 과거 데이터 수집을 방지하고 시스템 리소스를 최적화하기 위한 기준일을 설정함"""
     now = datetime.now()
-    limit = now - relativedelta(months=2) # GEMINI.md 지침에 따라 2개월로 설정
+    if now.day <= 15: limit = now - relativedelta(months=2) # 수집 기간 설정
+    else : limit = now - relativedelta(months=1) # 수집 기간 설정
     return limit.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 def parse_date_raw(date_text):

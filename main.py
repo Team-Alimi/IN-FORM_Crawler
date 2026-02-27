@@ -81,8 +81,14 @@ async def main():
     log_status("System", f"결과: 신규 {len(inserts)} / 수정 {len(updates)}", "SUCCESS")
     save_json(inserts, "INSERT_DATA.json")
     save_json(updates, "UPDATE_DATA.json")
+
+    # === PHASE 5: DB 업로드 (Loader 실행) ===
+    if inserts or updates:
+        log_status("System", "DB 적재 시작", "PHASE")
+        from common.db_loader import load_json_to_db
+        load_json_to_db()
     
-    log_status("System", "작업 완료", "DONE")
+    log_status("System", "전체 공정 완료", "DONE")
 
 if __name__ == "__main__":
     asyncio.run(main())
