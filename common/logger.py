@@ -1,6 +1,9 @@
 import os
+import time
 import logging
-from logging.handlers import TimedRotatingFileHandler
+from datetime import datetime
+
+from config import LOG_DIR
 
 _logger = None
 
@@ -18,18 +21,26 @@ def init_logger(crawler_type="default"):
 
     formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-    log_dir = "/opt/project/log"
-    os.makedirs(log_dir, exist_ok=True)
+    type_log_dir = os.path.join(LOG_DIR, crawler_type)
+    if not os.path.exists(type_log_dir):
+        os.makedirs(type_log_dir, exist_ok=True)
 
-    file_path = os.path.join(log_dir, f"crawler_{crawler_type}.log")
-    file_handler = TimedRotatingFileHandler(
-        filename=file_path,
-        when='midnight',
-        interval=1,
-        backupCount=30,
-        encoding='utf-8'
-    )
-    file_handler.suffix = "%Y-%m-%d"
+    now = time.time()
+    for f in os.listdir(type_log_dir):
+        f_path = os.path.join(type_log_dir, f)
+        if os.path.isfile(f_path) and f.endswith(".log"):
+            if os.stat(f_path).st_mtime < now - 30 * 86400:
+                try:
+                    os.remove(f_path)
+                except Exception:
+                    pass
+
+    # 로그 파일명 Type+YY+MM+DD+HH+MM+SS.log (예: A260228012402.log)
+    current_time = datetime.now().strftime("%y%m%d%H%M%S")
+    file_name = f"{crawler_type}{current_time}.log"
+    file_path = os.path.join(type_log_dir, file_name)
+
+    file_handler = logging.FileHandler(file_path, encoding='utf-8')
     file_handler.setFormatter(formatter)
     _logger.addHandler(file_handler)
 

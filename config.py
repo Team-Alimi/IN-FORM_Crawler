@@ -527,11 +527,12 @@ SITES = [
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.join(BASE_DIR, 'data')
 
+LOG_DIR = os.path.join(BASE_DIR, 'log')
 HISTORY_DIR = os.path.join(DATA_ROOT, 'history')
 QUEUE_DIR = os.path.join(DATA_ROOT, 'queue')
 
 # 폴더가 없으면 미리 생성
-for d in [HISTORY_DIR, QUEUE_DIR]:
+for d in [HISTORY_DIR, QUEUE_DIR, LOG_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
         print(f"📁 폴더 생성 완료: {d}")
