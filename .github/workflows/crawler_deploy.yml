@@ -55,6 +55,8 @@ jobs:
           # 1. 환경변수 파일(.env) 갱신
           echo "[1/4] 최신 환경변수 파일(.env) 생성 중..."
           mkdir -p /home/${{ secrets.SSH_USER }}/crawler
+          mkdir -p /home/${{ secrets.SSH_USER }}/crawler/data/history
+          mkdir -p /home/${{ secrets.SSH_USER }}/crawler/data/queue
           ENV_PATH="/home/${{ secrets.SSH_USER }}/crawler/.env"
           
           rm -f $ENV_PATH
