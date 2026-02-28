@@ -82,6 +82,11 @@ async def main():
     # === PHASE 4: 최종 결과 JSON 저장 ===
     inserts = [a for a in inserts if a.get('category_id') != 0]
     updates = [a for a in updates if a.get('category_id') != 0]
+
+    if inserts or updates:
+        from dataprepper.unifier import Unifier
+        Unifier().commit(inserts, updates)
+
     log_status("System", f"결과: 신규 {len(inserts)} / 수정 {len(updates)} (분류 미달 제외)", "SUCCESS")
     save_json(inserts, "INSERT_DATA.json")
     save_json(updates, "UPDATE_DATA.json")

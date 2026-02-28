@@ -56,7 +56,6 @@ class Unifier:
             groups[fp].append(a)
 
         inserts, updates = [], []
-        changed = False
 
         for fp, group in groups.items():
             tmp = {}
@@ -78,28 +77,54 @@ class Unifier:
                     is_upd = True
                     rep['updated_at'] = format_date_str(datetime.now())
                     c_ids, c_urls = self._merge(c_ids, c_urls, old.get('vendor_ids', []), old.get('vendor_urls', []))
-                hist_mgrs[sn].update(a)
 
             rep['vendor_ids'], rep['vendor_urls'] = c_ids, c_urls
-            rep.pop('vendor_id', None); rep.pop('site_name', None)
+            rep.pop('vendor_id', None)
 
             if is_upd:
                 updates.append(rep)
                 log_status("Unifier", f"수정 감지: {rep['title'][:15]}...", "LINK")
             elif is_new_fp:
                 inserts.append(rep)
-                self.meta[fp] = {'vendor_ids': c_ids, 'vendor_urls': c_urls, 'title': rep['title'], 'unique_id': rep['unique_id']}
-                changed = True
             else:
                 ext = self.meta[fp]
                 o_ids, o_urls = ext.get('vendor_ids', []), ext.get('vendor_urls', [])
                 n_ids, n_urls = self._merge(c_ids, c_urls, o_ids, o_urls)
                 if len(n_ids) > len(o_ids):
-                    ext['vendor_ids'], ext['vendor_urls'] = n_ids, n_urls
                     rep['vendor_ids'], rep['vendor_urls'] = n_ids, n_urls
-                    inserts.append(rep); changed = True
+                    inserts.append(rep)
                     log_status("Unifier", f"통합 완료: {rep['title'][:15]}...", "LINK")
 
-        if changed: self._save_meta()
-        for m in hist_mgrs.values(): m.save()
         return inserts, updates
+
+    def commit(self, inserts, updates):
+        """AI 분류가 완료된 최종 데이터를 히스토리에 기록하고 파일로 저장함"""
+        if not inserts and not updates: return
+        
+        from .deduplicate import HistoryManager
+        hist_mgrs = {}
+        all_articles = inserts + updates
+        
+        for a in all_articles:
+            # 1. 지문 메타데이터 업데이트
+            fp = self._make_fp(a)
+            if fp:
+                self.meta[fp] = {
+                    'vendor_ids': a.get('vendor_ids', []), 
+                    'vendor_urls': a.get('vendor_urls', []), 
+                    'title': a.get('title'), 
+                    'unique_id': a.get('unique_id')
+                }
+            
+            # 2. 사이트별 상세 히스토리 업데이트
+            site_name = a.pop('site_name', 'Global') # 여기서 site_name을 제거하며 사용함
+            if site_name not in hist_mgrs:
+                hist_mgrs[site_name] = HistoryManager(site_name)
+            
+            hist_mgrs[site_name].update(a)
+
+        # 3. 최종 파일 저장
+        self._save_meta()
+        for m in hist_mgrs.values():
+            m.save()
+        log_status("Unifier", f"히스토리 확정 완료 ({len(all_articles)}건 기록)", "SAVE")
