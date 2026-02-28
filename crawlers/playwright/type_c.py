@@ -68,6 +68,12 @@ class TypeCCrawler(BaseCrawler):
         loc = self.page.locator('.contents_wrap, .artclView')
         if await loc.count() == 0: return
 
+        # DOM 조작 전 이미지 첨부파일 먼저 추출
+        att = []
+        for img in await loc.locator('img').all():
+            src = await img.get_attribute('src')
+            if src: att.append({'attachment_url': await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)})
+
         # 표(Table)를 마크다운 형식으로 치환 (개행 방지 및 정제)
         await self.page.evaluate('''() => {
             const tables = document.querySelectorAll('.board-view-cnt table, .artclView table, .contents_wrap table');
@@ -85,10 +91,6 @@ class TypeCCrawler(BaseCrawler):
         }''')
 
         cnt = (await loc.first.inner_text()).strip()
-        att = []
-        for img in await loc.locator('img').all():
-            src = await img.get_attribute('src')
-            if src: att.append({'attachment_url': await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)})
 
         if not cnt and not att: return
         
