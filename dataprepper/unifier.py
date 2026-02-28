@@ -60,10 +60,11 @@ class Unifier:
         for fp, group in groups.items():
             tmp = {}
             for a in group:
-                vid, url = str(a.get('vendor_id')), a.get('original_url')
-                if vid and url: tmp[vid] = url
+                vid, url = str(a.get('vendor_id') or ''), a.get('original_url')
+                if vid and vid != 'None' and url: 
+                    tmp[vid] = url
             
-            c_ids = sorted([int(v) for v in tmp.keys()])
+            c_ids = sorted([int(v) for v in tmp.keys() if v.isdigit()])
             c_urls = [tmp[str(v)] for v in c_ids]
             rep = group[0]
             is_new_fp = fp not in self.meta

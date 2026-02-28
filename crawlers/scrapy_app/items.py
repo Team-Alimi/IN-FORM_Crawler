@@ -8,7 +8,9 @@ class InformArticle(scrapy.Item):
     original_url = scrapy.Field()
     created_at = scrapy.Field()
     updated_at = scrapy.Field()
-    vendor_id = scrapy.Field()
+    vendor_id = scrapy.Field() # 하위 호환용 (사용 자제)
+    vendor_ids = scrapy.Field() # 배열 구조 (신규)
+    vendor_urls = scrapy.Field() # 배열 구조 (신규)
     category_id = scrapy.Field()
     
     # 추가 메타데이터
