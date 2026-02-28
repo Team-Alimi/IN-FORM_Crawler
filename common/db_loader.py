@@ -111,8 +111,10 @@ def load_json_to_db():
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 if data:
-                    _execute_load(cursor, data, mode="INSERT")
-                    log_status("DBLoader", f"{file_name}: {len(data)}건 Insert 완료", "SUCCESS")
+                    data = [a for a in data if a.get('category_id') != 0]
+                    if data:
+                        _execute_load(cursor, data, mode="INSERT")
+                        log_status("DBLoader", f"{file_name}: {len(data)}건 Insert 완료", "SUCCESS")
                 os.remove(path)
 
             # 2. UPDATE 파일 처리
@@ -122,8 +124,10 @@ def load_json_to_db():
                 with open(path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 if data:
-                    _execute_load(cursor, data, mode="UPDATE")
-                    log_status("DBLoader", f"{file_name}: {len(data)}건 Update 완료", "SUCCESS")
+                    data = [a for a in data if a.get('category_id') != 0]
+                    if data:
+                        _execute_load(cursor, data, mode="UPDATE")
+                        log_status("DBLoader", f"{file_name}: {len(data)}건 Update 완료", "SUCCESS")
                 os.remove(path)
 
             conn.commit()
