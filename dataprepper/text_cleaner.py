@@ -20,6 +20,27 @@ class Cleaner:
         # 3. 문장 종결 패턴 (이 기호로 끝나면 정상적인 문장의 끝으로 간주)
         self.end_pattern = re.compile(r'([.?!:]|[다요음함임기])$')
 
+    def clean_title_text(self, text):
+        """게시글 제목 텍스트 정제"""
+        if not text: return ""
+
+        # 1. HTML 엔티티 복원 및 투명 공백 제거
+        text = html.unescape(text)
+        text = text.replace('\xa0', ' ').replace('\u200b', '').replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
+
+        # 2. 불필요한 뱃지/키워드 제거
+        patterns = [
+            r'\[새글\]', r'\(새글\)', r'새글',
+            r'\[NEW\]', r'\(NEW\)', r'NEW',
+            r'\[N\]', r'\(N\)'
+        ]
+        for p in patterns:
+            text = re.sub(p, '', text, flags=re.IGNORECASE)
+
+        # 3. 연속된 스페이스바 공백 1개로 압축
+        text = re.sub(r' {2,}', ' ', text)
+        return text.strip()
+
     def clean_contents_text(self, text):
         """단일 텍스트 정제"""
         if not text: return ""

@@ -36,14 +36,20 @@ def is_excluded(title):
 
 def process_article(article):
     """모든 크롤러에서 공통적으로 요구되는 텍스트 정제 및 유효성 검사 표준을 강제함"""
-    if is_excluded(article.get('title', '')): return None
-
     from dataprepper.text_cleaner import Cleaner
     cleaner = Cleaner()
-    
+
+    # [1] 제목 및 본문 정제 (공백, 불필요 태그 등 제거)
+    if article.get('title'):
+        article['title'] = cleaner.clean_title_text(article['title'])
+
     if article.get('content'):
         article['content'] = cleaner.clean_contents_text(article['content'])
+
+    # [2] 제외 키워드 검사 (정제된 제목 기준)
+    if is_excluded(article.get('title', '')): return None
     
+    # [3] 유효성 검사
     if not all(article.get(f) for f in ['unique_id', 'title', 'original_url']):
         return None
     if not article.get('content') and not article.get('attachments'):
