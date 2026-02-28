@@ -73,9 +73,16 @@ class TypeASpider(scrapy.Spider):
         view = response.css('.artclView')
         if not view: return
         html = view.get()
-        html = regex.sub(r'<br\s*/?>', '\n', html, flags=regex.IGNORECASE)
-        html = regex.sub(r'</(p|div|li|tr)>', '\n', html, flags=regex.IGNORECASE)
-        cnt = regex.sub(r'\n{3,}', '\n\n', regex.sub(r'<[^>]+>', ' ', html)).strip()
+        
+        # 표(Table) 태그를 마크다운 형식으로 변경
+        html = regex.sub(r'<(th|td)[^>]*>', ' | ', html, flags=regex.IGNORECASE)
+        html = regex.sub(r'</(th|td)>', ' ', html, flags=regex.IGNORECASE)
+        html = regex.sub(r'<tr[^>]*>', '\\n| ', html, flags=regex.IGNORECASE)
+        html = regex.sub(r'</tr>', ' |\\n', html, flags=regex.IGNORECASE)
+
+        html = regex.sub(r'<br\\s*/?>', '\\n', html, flags=regex.IGNORECASE)
+        html = regex.sub(r'</(p|div|li)>', '\\n', html, flags=regex.IGNORECASE)
+        cnt = regex.sub(r'\\n{3,}', '\\n\\n', regex.sub(r'<[^>]+>', ' ', html)).strip()
         att = [{'attachment_url': response.urljoin(src)} for src in view.css('img::attr(src)').getall()]
         if not cnt and not att: return
 

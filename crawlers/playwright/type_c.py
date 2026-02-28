@@ -67,6 +67,23 @@ class TypeCCrawler(BaseCrawler):
         """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
         loc = self.page.locator('.contents_wrap, .artclView')
         if await loc.count() == 0: return
+
+        # 표(Table)를 마크다운 형식으로 치환 (개행 방지 및 정제)
+        await self.page.evaluate('''() => {
+            const tables = document.querySelectorAll('.board-view-cnt table, .artclView table, .contents_wrap table');
+            tables.forEach(table => {
+                let md = '\\n\\n';
+                table.querySelectorAll('tr').forEach((row, i) => {
+                    let cols = Array.from(row.querySelectorAll('th, td')).map(c => c.innerText.trim().replace(/\\n/g, ' '));
+                    if (cols.length === 0) return;
+                    md += '| ' + cols.join(' | ') + ' |\\n';
+                    if (i === 0) md += '|' + cols.map(() => '---').join('|') + '|\\n';
+                });
+                const textNode = document.createTextNode(md + '\\n');
+                table.parentNode.replaceChild(textNode, table);
+            });
+        }''')
+
         cnt = (await loc.first.inner_text()).strip()
         att = []
         for img in await loc.locator('img').all():
