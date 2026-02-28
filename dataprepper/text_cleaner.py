@@ -41,6 +41,21 @@ class Cleaner:
         text = re.sub(r' {2,}', ' ', text)
         return text.strip()
 
+    def clean_html_to_text(self, html_content):
+        """HTML 본문을 텍스트로 변환하며 테이블을 [ 본 문 참 고 ]로 치환함"""
+        if not html_content: return ""
+
+        # 1. 테이블 치환
+        html_content = re.sub(r'<table.*?>.*?</table>', '\n[ 본 문 참 고 ]\n', html_content, flags=re.DOTALL | re.IGNORECASE)
+
+        # 2. 개행 관련 태그 치환
+        html_content = re.sub(r'<br\s*/?>', '\n', html_content, flags=re.IGNORECASE)
+        html_content = re.sub(r'</(p|div|li|tr)>', '\n', html_content, flags=re.IGNORECASE)
+
+        # 3. 나머지 모든 태그 제거 및 일반 텍스트 정제 호출
+        text = re.sub(r'<[^>]+>', ' ', html_content)
+        return self.clean_contents_text(text)
+
     def clean_contents_text(self, text):
         """단일 텍스트 정제"""
         if not text: return ""

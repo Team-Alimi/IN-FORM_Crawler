@@ -44,7 +44,11 @@ def process_article(article):
         article['title'] = cleaner.clean_title_text(article['title'])
 
     if article.get('content'):
-        article['content'] = cleaner.clean_contents_text(article['content'])
+        # HTML 태그가 포함된 경우(예: <p>, <div> 등) clean_html_to_text 호출
+        if '<' in article['content'] and '>' in article['content']:
+            article['content'] = cleaner.clean_html_to_text(article['content'])
+        else:
+            article['content'] = cleaner.clean_contents_text(article['content'])
 
     # [2] 제외 키워드 검사 (정제된 제목 기준)
     if is_excluded(article.get('title', '')): return None
