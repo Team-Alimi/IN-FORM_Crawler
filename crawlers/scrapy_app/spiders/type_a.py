@@ -72,12 +72,11 @@ class TypeASpider(scrapy.Spider):
         """텍스트 본문과 이미지(포스터 등)를 조합하여 정보의 완전성이 보장된 데이터를 생성함"""
         view = response.css('.artclView')
         if not view: return
-        html = view.get()
-        html = regex.sub(r'<br\s*/?>', '\n', html, flags=regex.IGNORECASE)
-        html = regex.sub(r'</(p|div|li|tr)>', '\n', html, flags=regex.IGNORECASE)
-        cnt = regex.sub(r'\n{3,}', '\n\n', regex.sub(r'<[^>]+>', ' ', html)).strip()
+        
+        # 원본 HTML 추출
+        raw_html = view.get()
         att = [{'attachment_url': response.urljoin(src)} for src in view.css('img::attr(src)').getall()]
-        if not cnt and not att: return
+        if not raw_html and not att: return
 
         # 글번호 및 날짜 재추출
         art_num = num
@@ -94,9 +93,10 @@ class TypeASpider(scrapy.Spider):
                 elif '수정일' in dt: u_at = format_date_str(d_obj)
 
         article = InformArticle()
-        article['unique_id'], article['title'], article['content'] = f"{self.code}{art_num}", title, cnt
+        article['unique_id'], article['title'], article['content'] = f"{self.code}{art_num}", title, raw_html
         article['original_url'], article['created_at'], article['updated_at'] = response.url, c_at, u_at
-        article['vendor_id'], article['site_name'], article['site_code'] = self.vendor_id, self.name, self.code
+        article['vendor_ids'], article['vendor_urls'] = [self.vendor_id], [response.url]
+        article['site_name'], article['site_code'] = self.name, self.code
         article['attachments'] = att
         self.log_msg(f"수집 성공: {title[:20]}... ({len(att)} imgs)", "COLLECT")
         yield article
