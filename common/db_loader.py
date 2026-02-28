@@ -12,13 +12,14 @@ def _execute_load(cursor, data, mode="INSERT"):
         return
 
     for article in data:
+
         if mode == "INSERT":
             # [1] school_articles 테이블에 삽입
             sql_article = """
-                INSERT INTO school_articles
-                    (title, content, start_date, due_date, created_at, updated_at, category_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
+                          INSERT INTO school_articles
+                          (title, content, start_date, due_date, created_at, updated_at, category_id)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s) \
+                          """
             cursor.execute(sql_article, (
                 article.get('title'),
                 article.get('content'),
@@ -42,7 +43,8 @@ def _execute_load(cursor, data, mode="INSERT"):
             attachments = article.get('attachments', [])
             if attachments:
                 sql_attachment = "INSERT INTO attachments (attachment_url, article_id, article_type) VALUES (%s, %s, %s)"
-                attachment_values = [(att.get('attachment_url'), article_id, 'SCHOOL') for att in attachments if att.get('attachment_url')]
+                attachment_values = [(att.get('attachment_url'), article_id, 'SCHOOL') for att in attachments if
+                                     att.get('attachment_url')]
                 if attachment_values:
                     cursor.executemany(sql_attachment, attachment_values)
 
@@ -51,20 +53,25 @@ def _execute_load(cursor, data, mode="INSERT"):
             find_id_sql = "SELECT article_id FROM school_article_vendors WHERE original_url = %s LIMIT 1"
             cursor.execute(find_id_sql, (article['original_url'],))
             res = cursor.fetchone()
-            
+
             if res:
                 article_id = res['article_id']
+
                 # [1] school_articles 업데이트
                 sql_update_art = """
-                    UPDATE school_articles
-                    SET title = %s, content = %s, updated_at = %s, category_id = %s,
-                        start_date = %s, due_date = %s
-                    WHERE article_id = %s
-                """
+                                 UPDATE school_articles
+                                 SET title       = %s, \
+                                     content     = %s, \
+                                     updated_at  = %s, \
+                                     category_id = %s,
+                                     start_date  = %s, \
+                                     due_date    = %s
+                                 WHERE article_id = %s \
+                                 """
                 cursor.execute(sql_update_art, (
-                    article['title'], article['content'], article['updated_at'], 
-                    article.get('category_id'), article.get('start_date'), 
-                    article.get('due_date'), article_id
+                    article['title'], article['content'], article['updated_at'],
+                    article.get('category_id'),
+                    article.get('start_date'), article.get('due_date'), article_id
                 ))
 
                 # [2] 맵핑 정보 갱신
@@ -76,7 +83,7 @@ def _execute_load(cursor, data, mode="INSERT"):
                     if not cursor.fetchone():
                         sql_ins_map = "INSERT INTO school_article_vendors (article_id, vendor_id, original_url) VALUES (%s, %s, %s)"
                         cursor.execute(sql_ins_map, (article_id, int(v_id), url))
-                
+
                 # [3] 첨부파일 갱신
                 attachments = article.get('attachments', [])
                 for att in attachments:
@@ -96,7 +103,7 @@ def load_json_to_db():
     conn = pymysql.connect(**DB_CONFIG)
 
     try:
-        with conn.cursor() as cursor:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             # 1. INSERT 파일 처리
             insert_files = glob.glob(os.path.join(QUEUE_DIR, "INSERT_DATA*.json"))
             for path in insert_files:
