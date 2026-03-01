@@ -76,5 +76,8 @@ class TypeBCrawler(BaseCrawler):
         self.process_item({
             'unique_id': uid, 'title': title, 'content': cnt,
             'original_url': self.page.url, 'created_at': format_date_str(dt_obj),
-            'updated_at': format_date_str(dt_obj), 'vendor_id': self.vendor_id, 'attachments': att
+            'updated_at': format_date_str(dt_obj), 
+            'vendor_ids': [self.vendor_id], 
+            'vendor_urls': [self.page.url],
+            'attachments': att
         })

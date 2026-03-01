@@ -60,9 +60,17 @@ class Unifier:
         for fp, group in groups.items():
             tmp = {}
             for a in group:
+                # 1. 단일 필드 처리
                 vid, url = str(a.get('vendor_id') or ''), a.get('original_url')
                 if vid and vid != 'None' and url: 
                     tmp[vid] = url
+                
+                # 2. 배열 필드 처리
+                v_ids = a.get('vendor_ids', [])
+                v_urls = a.get('vendor_urls', [])
+                for i, v in enumerate(v_ids):
+                    if i < len(v_urls):
+                        tmp[str(v)] = v_urls[i]
             
             c_ids = sorted([int(v) for v in tmp.keys() if v.isdigit()])
             c_urls = [tmp[str(v)] for v in c_ids]
