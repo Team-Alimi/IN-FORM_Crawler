@@ -482,6 +482,14 @@ SITES = [
         'vendor_id': 35
     },
 
+    {
+        'type': 'A',
+        'name': '인하공학교육혁신센터',
+        'code': 'ICEE',
+        'url': 'https://icee.inha.ac.kr/icee/10360/subview.do',
+        'vendor_id': 38
+    },
+
 
 
 
