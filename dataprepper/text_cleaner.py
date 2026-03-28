@@ -21,25 +21,31 @@ class Cleaner:
         self.end_pattern = re.compile(r'([.?!:]|[다요음함임기])$')
 
     def clean_title_text(self, text):
-        """게시글 제목 텍스트 정제"""
+        """게시글 제목 텍스트 정제 (말머리 및 뱃지 통합 제거)"""
         if not text: return ""
 
-        # 1. HTML 엔티티 복원 및 투명 공백 제거
+        # 1. HTML 엔티티 복원 및 기본 공백 정제
         text = html.unescape(text)
         text = text.replace('\xa0', ' ').replace('\u200b', '').replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
+        text = re.sub(r' {2,}', ' ', text).strip()
+        base_text = text
 
-        # 2. 불필요한 뱃지/키워드 제거
-        patterns = [
-            r'\[새글\]', r'\(새글\)', r'새글',
-            r'\[NEW\]', r'\(NEW\)', r'NEW',
-            r'\[N\]', r'\(N\)'
-        ]
-        for p in patterns:
-            text = re.sub(p, '', text, flags=re.IGNORECASE)
+        # 2. 제목 맨 앞의 [말머리] 패턴 제거
+        text = re.sub(r'^(?:\[[^\]]*\]\s*)+', '', text)
 
-        # 3. 연속된 스페이스바 공백 1개로 압축
-        text = re.sub(r' {2,}', ' ', text)
-        return text.strip()
+        # 3. 불필요한 뱃지/키워드 통합 제거
+        # [새글], (새글), 새글, [NEW], (NEW), NEW, [N], (N), N 등 제거
+        badge_pattern = r'\[(?:새글|NEW|N)\]|\((?:새글|NEW|N)\)|(?:새글|NEW|N)\b'
+        text = re.sub(badge_pattern, '', text, flags=re.IGNORECASE)
+
+        # 4. 연속된 공백 압축 및 최종 정리
+        text = re.sub(r' {2,}', ' ', text).strip()
+
+        # 5. 정제한 결과가 너무 짧으면(2자 미만) 정제 전 텍스트(base_text) 롤백
+        if len(text) < 2:
+            return base_text
+            
+        return text
 
     def clean_html_to_text(self, html_content):
         """HTML 본문을 텍스트로 변환하며 테이블을 [ 본 문 참 고 ]로 치환함"""
