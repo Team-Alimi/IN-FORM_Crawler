@@ -89,28 +89,27 @@ KEYWORD_CATEGORIES = {
     ]
 }
 
-# 5. 사이트 목록 정의
-def _load_all_sites():
-    from glob import glob
+# 5. 타입별 사이트 목록 로드 함수
+def load_sites(typ):
+    """지정된 타입의 시드 파일만 타겟팅하여 로드함"""
     import json
-
-    all_sites = []
-    seeds_dir = os.path.join(DATA_ROOT, 'seeds')
-    json_paths = glob(os.path.join(seeds_dir, 'type_*.json'))
+    from common.logger import log_status
     
-    for path in json_paths:
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                all_sites.extend(json.load(f))
-        except Exception as e:
-            from common.logger import log_status
-            log_status("Config", f"사이트 로딩 실패 ({path}): {e}", "WARN")
-            
-    return all_sites
+    seeds_dir = os.path.join(DATA_ROOT, 'seeds')
+    path = os.path.join(seeds_dir, f'type_{typ.lower()}.json')
+    
+    if not os.path.exists(path):
+        log_status("Config", f"시드 파일 없음: {path}", "WARN")
+        return []
+        
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        log_status("Config", f"사이트 로딩 실패 ({path}): {e}", "WARN")
+        return []
 
-SITES = _load_all_sites()
-
-# 6. 크롤링 결과 JSON으로 저장
+# 6. 크롤링 결과 저장 폴더 생성
 for d in [HISTORY_DIR, QUEUE_DIR, LOG_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)

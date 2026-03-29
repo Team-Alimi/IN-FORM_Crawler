@@ -4,8 +4,8 @@ import os
 import json
 import asyncio
 
-from config import SITES, QUEUE_DIR
-from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler
+from config import load_sites, QUEUE_DIR
+from crawlers import TypeACrawler, TypeBCrawler, TypeCCrawler, TypeDCrawler, TypeECrawler
 from common.logger import log_status, init_logger
 
 
@@ -14,6 +14,8 @@ async def run_crawler(site):
     if site['type'] == 'A': c = TypeACrawler(site)
     elif site['type'] == 'B': c = TypeBCrawler(site)
     elif site['type'] == 'C': c = TypeCCrawler(site)
+    elif site['type'] == 'D': c = TypeDCrawler(site)
+    elif site['type'] == 'E': c = TypeECrawler(site)
     else: return site['name'], []
     return await c.run()
 
@@ -38,9 +40,10 @@ async def main():
     init_logger(args.type)
 
     log_status("System", f"{typ} 타입 시작", "START")
-    targets = [s for s in SITES if s['type'] == typ]
+
+    targets = load_sites(typ)
     if not targets:
-        log_status("System", f"대상 없음: {typ}", "ERROR"); sys.exit(1)
+        log_status("System", f"대상 없음 또는 로드 실패: {typ}", "ERROR"); sys.exit(1)
 
     # === PHASE 1: 비동기 크롤링 수행 ===
     sem = asyncio.Semaphore(min(len(targets), 8))
