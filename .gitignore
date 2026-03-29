@@ -17,7 +17,8 @@ secrets.json
 logs/
 *.log
 crawled_data/
-data/
+data/history/*
+data/queue/*
 GEMINI.md
 
 # --- 가상환경 ---
