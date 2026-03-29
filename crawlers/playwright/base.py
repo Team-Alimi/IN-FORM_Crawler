@@ -23,7 +23,10 @@ class BaseCrawler:
     async def _init_driver(self):
         """Playwright 브라우저 및 컨텍스트 초기화"""
         self.pw = await async_playwright().start()
-        self.browser = await self.pw.chromium.launch(headless=True)
+        self.browser = await self.pw.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox']
+        )
         self.ctx = await self.browser.new_context(user_agent=config.FINAL_USER_AGENT)
         self.page = await self.ctx.new_page()
 

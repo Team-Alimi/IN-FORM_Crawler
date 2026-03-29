@@ -1,2 +1,3 @@
 from .type_b import TypeBCrawler
 from .type_c import TypeCCrawler
+from .type_e import TypeECrawler
