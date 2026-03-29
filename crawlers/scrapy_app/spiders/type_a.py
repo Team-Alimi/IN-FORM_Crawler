@@ -1,6 +1,6 @@
 import json
 import os
-import re as regex
+import re
 import scrapy
 from datetime import datetime
 from crawlers.scrapy_app.items import InformArticle
@@ -36,13 +36,15 @@ class TypeASpider(scrapy.Spider):
         reg_cnt = 0
         for row in rows:
             num = row.css('._artclTdNum::text').get(default='').strip()
-            is_pinned = not num.isdigit() # 숫자가 아니면 고정 공지
+
+            # 고정 공지 판별
+            is_pinned = not num.isdigit()
             if not is_pinned: reg_cnt += 1
 
             dt_txt = row.css('._artclTdRdate::text').get()
-            tit_c = row.css('._artclTdTitle')
-            tit = "".join(tit_c.xpath('.//text()').getall()).strip() if tit_c else None
-            if not dt_txt or not tit: continue
+            title_c = row.css('._artclTdTitle')
+            title = "".join(title_c.xpath('.//text()').getall()).strip() if title_c else None
+            if not dt_txt or not title: continue
 
             dt_obj = parse_date_raw(dt_txt)
             if dt_obj is None: continue
@@ -53,13 +55,13 @@ class TypeASpider(scrapy.Spider):
                     self.streak += 1
                     if self.streak >= 20: 
                         self.log_msg("기한 도달로 인한 종료.", "STOP"); return
-                continue # 기한 지난 글 수집 방지
+                continue
             else:
                 if not is_pinned: self.streak = 0
 
             lnk = row.css('._artclTdTitle a::attr(href)').get()
             if lnk:
-                yield response.follow(lnk, callback=self.parse_detail, cb_kwargs={'title': tit, 'num': num})
+                yield response.follow(lnk, callback=self.parse_detail, cb_kwargs={'title': title, 'num': num})
 
         if self.page < tot and self.page < 100:
             if reg_cnt > 0 or self.streak < 20:
@@ -78,7 +80,7 @@ class TypeASpider(scrapy.Spider):
         att = [{'attachment_url': response.urljoin(src)} for src in view.css('img::attr(src)').getall()]
         if not raw_html and not att: return
 
-        # 글번호 및 날짜 재추출
+        # 글번호 및 날짜 추출
         art_num = num
         for dl in response.css('.artclViewHead .left dl'):
             if '글번호' in (dl.css('dt::text').get() or ''):

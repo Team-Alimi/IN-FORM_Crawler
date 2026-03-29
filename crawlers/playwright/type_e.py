@@ -26,14 +26,16 @@ class TypeECrawler(BaseCrawler):
             
             if not await self.safe_goto(list_url):
                 break
-
+            
+            # 목록 로딩 대기
             try:
                 await self.page.wait_for_selector('tbody tr', timeout=10000)
             except:
                 self.log(f"목록 로딩 실패 (Page {page_num})", "WARN")
                 break
             
-            rows_count = await self.page.locator('tbody tr').count()
+            rows_loc = self.page.locator('tbody tr')
+            rows_count = await rows_loc.count()
             if rows_count == 0:
                 break
                 
@@ -42,19 +44,20 @@ class TypeECrawler(BaseCrawler):
 
             for i in range(rows_count):
                 try:
-                    row = self.page.locator('tbody tr').nth(i)
+                    row = rows_loc.nth(i)
                     num_loc = row.locator('._artclTdNum').first
-
+                    
+                    # 데이터 로딩 대기
                     await num_loc.wait_for(state="visible", timeout=5000)
                     
-                    num_text = (await num_loc.inner_text()).strip()
-                    is_pinned = not num_text.isdigit()
+                    art_num = (await num_loc.inner_text()).strip()
+                    is_pinned = not art_num.isdigit()
                     
                     title_elem = row.locator('._artclTdTitle').first
                     title = (await title_elem.inner_text()).strip()
-                    date_text = (await row.locator('._artclTdRdate').first.inner_text()).strip()
+                    dt_txt = (await row.locator('._artclTdRdate').first.inner_text()).strip()
                     
-                    dt_obj = parse_date_raw(date_text)
+                    dt_obj = parse_date_raw(dt_txt)
                     if not dt_obj or dt_obj < self.limit:
                         if not is_pinned:
                             streak += 1
@@ -74,7 +77,7 @@ class TypeECrawler(BaseCrawler):
                             'url': abs_url,
                             'title': title,
                             'dt_obj': dt_obj,
-                            'num': num_text
+                            'art_num': art_num
                         })
                 except Exception as e:
                     continue
@@ -86,9 +89,9 @@ class TypeECrawler(BaseCrawler):
             for item in items_to_visit:
                 try:
                     if await self.safe_goto(item['url']):
+                        # 상세 페이지 로딩 대기
                         await self.page.wait_for_selector('.artclView', timeout=15000)
-                        await self.parse_detail(item['title'], item['dt_obj'], item['num'])
-
+                        await self.parse_detail(item['title'], item['dt_obj'], item['art_num'])
                         await asyncio.sleep(0.5)
                 except Exception as e:
                     self.log(f"상세 페이지 접근 오류 ({item['title'][:10]}): {e}", "WARN")
@@ -104,13 +107,17 @@ class TypeECrawler(BaseCrawler):
         """상세 페이지에서 본문 및 이미지 추출"""
         try:
             view = self.page.locator('.artclView').first
-            if await view.count() == 0: return
+            if await view.count() == 0:
+                return
+
+            # 원본 HTML 추출
             raw_html = await view.inner_html()
             images = await view.locator('img').all()
             attachments = []
             for img in images:
                 src = await img.get_attribute('src')
                 if src:
+                    # 상대 경로를 절대 경로로 변환
                     abs_url = await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)
                     attachments.append({'attachment_url': abs_url})
             
