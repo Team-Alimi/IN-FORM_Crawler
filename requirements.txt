@@ -6,3 +6,5 @@ python-dateutil
 cryptography
 openai
 tenacity
+thefuzz
+python-Levenshtein
