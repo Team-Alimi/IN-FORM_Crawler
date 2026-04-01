@@ -68,8 +68,10 @@ async def main():
     if all_articles:
         from dataprepper.unifier import Unifier
         inserts, updates = Unifier().unify(all_articles)
+        log_status("System", f"통합 분석 완료 (신규 {len(inserts)} / 수정 {len(updates)})", "SUCCESS")
     else:
         inserts, updates = [], []
+        log_status("System", "처리할 데이터 없음", "INFO")
 
     # === PHASE 3: AI 기반 분류 및 날짜 추출 ===
     if inserts or updates:
@@ -96,7 +98,7 @@ async def main():
         log_status("System", "DB 적재 시작", "PHASE")
         from common.db_loader import load_json_to_db
         load_json_to_db()
-    
+
     log_status("System", "전체 공정 완료", "DONE")
 
 if __name__ == "__main__":
