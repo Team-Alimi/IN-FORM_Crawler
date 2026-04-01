@@ -59,24 +59,39 @@ class Unifier:
             a['content_raw'] = cleaner.clean_html_to_text(a.get('content', ''))
 
         ## === PHASE 2: Fuzzy Matching & Jaccard Matching ===
+        from .similarity_engine import JACCARD_THRESHOLD, GREY_ZONE_THRESHOLD
+
         groups = []
         for a in articles:
             found_group = None
+            max_sim = 0.0
+
             for group in groups:
                 rep = group[0]
-                # 글제목에 대하여 Fuzzy Matching 실시
+                # [1] Fuzzy Title Matching
                 if engine.fuzzy_match(a['norm_title'], rep['norm_title']):
                     found_group = group; break
-                # 글제목 및 본문에 대하여 Jaccard Matching 실시
-                if engine.jaccard_match(a, rep):
+                
+                # [2] Jaccard Matching
+                sim = engine.get_jaccard_similarity(a, rep)
+                if sim >= JACCARD_THRESHOLD:
                     found_group = group; break
+                
+                # [3] Grey Zone 식별을 위해 최대 유사도 기록
+                if sim > max_sim:
+                    max_sim = sim
             
-            if found_group: found_group.append(a)
-            else: groups.append([a])
+            if found_group:
+                found_group.append(a)
+            else:
+                # 어느 그룹에도 속하지 않았으나, Grey Zone 범위에 있다면 마킹
+                if max_sim >= GREY_ZONE_THRESHOLD:
+                    a['admin_status'] = 'SUSPECTED_DUPLICATE'
+                groups.append([a])
 
         inserts, updates = [], []
 
-        # 2. 그룹별 통합 및 상태 판별 (Phase 2-4)
+        # === PHASE 3: 그룹별 통합 및 상태 판별 ===
         for group in groups:
             # 게시글 수정 여부 판별
             is_upd = False

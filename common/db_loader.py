@@ -14,11 +14,12 @@ def _execute_load(cursor, data, mode="INSERT"):
     for article in data:
 
         if mode == "INSERT":
-            # [1] school_articles 테이블에 삽입
+            # [1] school_articles 테이블에 삽입 (admin_status가 명시되어 있으면 반영)
+            admin_status = article.get('admin_status', 'INSPECTED_YET')
             sql_article = """
                           INSERT INTO school_articles
-                          (title, content, start_date, due_date, created_at, updated_at, category_id)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s) \
+                          (title, content, start_date, due_date, created_at, updated_at, category_id, admin_status)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
                           """
             cursor.execute(sql_article, (
                 article.get('title'),
@@ -27,7 +28,8 @@ def _execute_load(cursor, data, mode="INSERT"):
                 article.get('due_date'),
                 article.get('created_at'),
                 article.get('updated_at'),
-                article.get('category_id')
+                article.get('category_id'),
+                admin_status
             ))
             article_id = cursor.lastrowid
 
@@ -111,7 +113,7 @@ def load_json_to_db():
 
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # 1. INSERT 파일 처리
+            # [1] INSERT 파일 처리
             insert_files = glob.glob(os.path.join(QUEUE_DIR, "INSERT_DATA*.json"))
             for path in insert_files:
                 file_name = os.path.basename(path)
@@ -122,7 +124,7 @@ def load_json_to_db():
                     log_status("DBLoader", f"{file_name}: {len(data)}건 Insert 완료", "SUCCESS")
                 os.remove(path)
 
-            # 2. UPDATE 파일 처리
+            # [2] UPDATE 파일 처리
             update_files = glob.glob(os.path.join(QUEUE_DIR, "UPDATE_DATA*.json"))
             for path in update_files:
                 file_name = os.path.basename(path)
