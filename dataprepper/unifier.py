@@ -44,65 +44,108 @@ class Unifier:
         return s_ids, [m[str(k)] for k in s_ids]
 
     def unify(self, articles):
-        """본문/이미지 지문 분석을 통해 중복 수집을 방지하고 통합된 게시글 정보를 생성함"""
+        """지속형 다계층 그룹화를 통해 중복을 제거하고 마스터 레코드를 선정함"""
+        from .similarity_engine import SimilarityEngine
+        from .text_cleaner import Cleaner
         from .deduplicate import HistoryManager
-        hist_mgrs = {}
         
-        groups = {}
+        engine = SimilarityEngine()
+        cleaner = Cleaner()
+        hist_mgrs = {}
+
+        # === PHASE 1: 데이터 전처리 ===
         for a in articles:
-            fp = self._make_fp(a)
-            if not fp: continue
-            if fp not in groups: groups[fp] = []
-            groups[fp].append(a)
+            a['norm_title'] = cleaner.normalize_for_similarity(a['title'])
+            a['content_raw'] = cleaner.clean_html_to_text(a.get('content', ''))
+
+        ## === PHASE 2: Fuzzy Matching & Jaccard Matching ===
+        from .similarity_engine import JACCARD_THRESHOLD, GREY_ZONE_THRESHOLD
+
+        groups = []
+        for a in articles:
+            found_group = None
+            max_sim = 0.0
+
+            for group in groups:
+                rep = group[0]
+                # [1] Fuzzy Title Matching
+                if engine.fuzzy_match(a['norm_title'], rep['norm_title']):
+                    found_group = group; break
+                
+                # [2] Jaccard Matching
+                sim = engine.get_jaccard_similarity(a, rep)
+                if sim >= JACCARD_THRESHOLD:
+                    found_group = group; break
+                
+                # [3] Grey Zone 식별을 위해 최대 유사도 기록
+                if sim > max_sim:
+                    max_sim = sim
+            
+            if found_group:
+                found_group.append(a)
+            else:
+                # 어느 그룹에도 속하지 않았으나, Grey Zone 범위에 있다면 마킹
+                if max_sim >= GREY_ZONE_THRESHOLD:
+                    a['admin_status'] = 'SUSPECTED_DUPLICATE'
+                groups.append([a])
 
         inserts, updates = [], []
 
-        for fp, group in groups.items():
-            tmp = {}
-            for a in group:
-                # 1. 단일 필드 처리
-                vid, url = str(a.get('vendor_id') or ''), a.get('original_url')
-                if vid and vid != 'None' and url: 
-                    tmp[vid] = url
-                
-                # 2. 배열 필드 처리
-                v_ids = a.get('vendor_ids', [])
-                v_urls = a.get('vendor_urls', [])
-                for i, v in enumerate(v_ids):
-                    if i < len(v_urls):
-                        tmp[str(v)] = v_urls[i]
-            
-            c_ids = sorted([int(v) for v in tmp.keys() if v.isdigit()])
-            c_urls = [tmp[str(v)] for v in c_ids]
-            rep = group[0]
-            is_new_fp = fp not in self.meta
+        # === PHASE 3: 그룹별 통합 및 상태 판별 ===
+        for group in groups:
+            # 게시글 수정 여부 판별
             is_upd = False
-
             for a in group:
                 sn = a.get('site_name', 'Unknown')
                 if sn not in hist_mgrs: hist_mgrs[sn] = HistoryManager(sn)
                 _, up, old = hist_mgrs[sn].check(a)
                 if up:
-                    is_upd = True
-                    rep['updated_at'] = format_date_str(datetime.now())
-                    c_ids, c_urls = self._merge(c_ids, c_urls, old.get('vendor_ids', []), old.get('vendor_urls', []))
+                    is_upd = True; a['is_updated_delta'] = True
+                    # 수정 감지 시 기존 출처 정보 병합을 위해 저장
+                    a['old_vendor_ids'], a['old_vendor_urls'] = old.get('vendor_ids', []), old.get('vendor_urls', [])
+            
+            # 대표 데이터(Master) 선정
+            # 우선순위: 수정 여부 > 최신 날짜 > 정보량
+            master = sorted(group, key=lambda x: (
+                x.get('is_updated_delta', False),
+                x.get('created_at', ''),
+                len(x.get('content_raw', '') or ''),
+                len(x.get('attachments', []) or '')
+            ), reverse=True)[0]
 
-            rep['vendor_ids'], rep['vendor_urls'] = c_ids, c_urls
-            rep.pop('vendor_id', None)
+            # 출처 통합
+            tmp_sources = {}
+            for a in group:
+                # 개별 출처 정보
+                for i, vid in enumerate(a.get('vendor_ids', [])):
+                    tmp_sources[str(vid)] = a.get('vendor_urls', [])[i]
+                # 수정 데이터의 경우 기존 출처 정보도 통합
+                if a.get('is_updated_delta'):
+                    for i, vid in enumerate(a.get('old_vendor_ids', [])):
+                        tmp_sources[str(vid)] = a.get('old_vendor_urls', [])[i]
+            
+            c_ids = sorted([int(v) for v in tmp_sources.keys() if v.isdigit()])
+            c_urls = [tmp_sources[str(v)] for v in c_ids]
+            
+            master['vendor_ids'], master['vendor_urls'] = c_ids, c_urls
+            master.pop('is_updated_delta', None); master.pop('old_vendor_ids', None); master.pop('old_vendor_urls', None)
+
+            # 글로벌 지문 히스토리 체크 및 최종 분류
+            fp = self._make_fp(master)
+            is_new_fp = fp not in self.meta
 
             if is_upd:
-                updates.append(rep)
-                log_status("Unifier", f"수정 감지: {rep['title'][:15]}...", "LINK")
+                master['updated_at'] = format_date_str(datetime.now())
+                updates.append(master)
+                log_status("Unifier", f"수정 감지: {master['title'][:15]}...", "LINK")
             elif is_new_fp:
-                inserts.append(rep)
+                inserts.append(master)
+                log_status("Unifier", f"신규 수집: {master['title'][:15]}...", "COLLECT")
             else:
-                ext = self.meta[fp]
-                o_ids, o_urls = ext.get('vendor_ids', []), ext.get('vendor_urls', [])
-                n_ids, n_urls = self._merge(c_ids, c_urls, o_ids, o_urls)
-                if len(n_ids) > len(o_ids):
-                    rep['vendor_ids'], rep['vendor_urls'] = n_ids, n_urls
-                    inserts.append(rep)
-                    log_status("Unifier", f"통합 완료: {rep['title'][:15]}...", "LINK")
+                # 기존 FP가 존재하나 출처 정보가 확장된 경우 Insert 처리 (Deduplicate에서 신규 취급)
+                if len(c_ids) > len(self.meta[fp].get('vendor_ids', [])):
+                    inserts.append(master)
+                    log_status("Unifier", f"통합 완료: {master['title'][:15]}...", "LINK")
 
         return inserts, updates
 
@@ -115,7 +158,7 @@ class Unifier:
         all_articles = inserts + updates
         
         for a in all_articles:
-            # 1. 지문 메타데이터 업데이트
+            # 지문 메타데이터 업데이트
             fp = self._make_fp(a)
             if fp:
                 self.meta[fp] = {
@@ -125,14 +168,14 @@ class Unifier:
                     'unique_id': a.get('unique_id')
                 }
             
-            # 2. 사이트별 상세 히스토리 업데이트
-            site_name = a.pop('site_name', 'Global') # 여기서 site_name을 제거하며 사용함
+            # 사이트별 상세 히스토리 업데이트
+            site_name = a.pop('site_name', 'Global')
             if site_name not in hist_mgrs:
                 hist_mgrs[site_name] = HistoryManager(site_name)
             
             hist_mgrs[site_name].update(a)
 
-        # 3. 최종 파일 저장
+        # 최종 파일 저장
         self._save_meta()
         for m in hist_mgrs.values():
             m.save()

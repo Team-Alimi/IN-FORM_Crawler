@@ -14,11 +14,12 @@ def _execute_load(cursor, data, mode="INSERT"):
     for article in data:
 
         if mode == "INSERT":
-            # [1] school_articles 테이블에 삽입
+            # [1] school_articles 테이블에 삽입 (admin_status가 명시되어 있으면 반영)
+            admin_status = article.get('admin_status', 'INSPECTED_YET')
             sql_article = """
                           INSERT INTO school_articles
-                          (title, content, start_date, due_date, created_at, updated_at, category_id)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s) \
+                          (title, content, start_date, due_date, created_at, updated_at, category_id, admin_status)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
                           """
             cursor.execute(sql_article, (
                 article.get('title'),
@@ -27,7 +28,8 @@ def _execute_load(cursor, data, mode="INSERT"):
                 article.get('due_date'),
                 article.get('created_at'),
                 article.get('updated_at'),
-                article.get('category_id')
+                article.get('category_id'),
+                admin_status
             ))
             article_id = cursor.lastrowid
 
@@ -49,23 +51,30 @@ def _execute_load(cursor, data, mode="INSERT"):
                     cursor.executemany(sql_attachment, attachment_values)
 
         elif mode == "UPDATE":
-            # URL을 기준으로 article_id 찾기
-            find_id_sql = "SELECT article_id FROM school_article_vendors WHERE original_url = %s LIMIT 1"
-            cursor.execute(find_id_sql, (article['original_url'],))
-            res = cursor.fetchone()
+            # [1] 다중 URL 중 하나라도 매칭되는 article_id 찾기
+            vendor_urls = article.get('vendor_urls', [])
+            article_id = None
+            
+            if vendor_urls:
+                format_strings = ','.join(['%s'] * len(vendor_urls))
+                find_id_sql = f"SELECT article_id FROM school_article_vendors WHERE original_url IN ({format_strings}) LIMIT 1"
+                cursor.execute(find_id_sql, tuple(vendor_urls))
+                res = cursor.fetchone()
+                if res:
+                    article_id = res['article_id']
 
-            if res:
-                article_id = res['article_id']
-
-                # [1] school_articles 업데이트
+            if article_id:
+                # [2] school_articles 업데이트
                 sql_update_art = """
                                  UPDATE school_articles
-                                 SET title       = %s, \
-                                     content     = %s, \
-                                     updated_at  = %s, \
-                                     category_id = %s,
-                                     start_date  = %s, \
-                                     due_date    = %s
+                                 SET title        = %s, \
+                                     content      = %s, \
+                                     updated_at   = %s, \
+                                     category_id  = %s, \
+                                     start_date   = %s, \
+                                     due_date     = %s, \
+                                     is_published = 0, \
+                                     admin_status = 'INSPECTED_YET'
                                  WHERE article_id = %s \
                                  """
                 cursor.execute(sql_update_art, (
@@ -74,7 +83,7 @@ def _execute_load(cursor, data, mode="INSERT"):
                     article.get('start_date'), article.get('due_date'), article_id
                 ))
 
-                # [2] 맵핑 정보 갱신
+                # [3] 맵핑 정보 갱신
                 vendor_ids = article.get('vendor_ids', [])
                 vendor_urls = article.get('vendor_urls', [])
                 for v_id, url in zip(vendor_ids, vendor_urls):
@@ -84,7 +93,7 @@ def _execute_load(cursor, data, mode="INSERT"):
                         sql_ins_map = "INSERT INTO school_article_vendors (article_id, vendor_id, original_url) VALUES (%s, %s, %s)"
                         cursor.execute(sql_ins_map, (article_id, int(v_id), url))
 
-                # [3] 첨부파일 갱신
+                # [4] 첨부파일 갱신
                 attachments = article.get('attachments', [])
                 for att in attachments:
                     url = att.get('attachment_url')
@@ -104,7 +113,7 @@ def load_json_to_db():
 
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-            # 1. INSERT 파일 처리
+            # [1] INSERT 파일 처리
             insert_files = glob.glob(os.path.join(QUEUE_DIR, "INSERT_DATA*.json"))
             for path in insert_files:
                 file_name = os.path.basename(path)
@@ -115,7 +124,7 @@ def load_json_to_db():
                     log_status("DBLoader", f"{file_name}: {len(data)}건 Insert 완료", "SUCCESS")
                 os.remove(path)
 
-            # 2. UPDATE 파일 처리
+            # [2] UPDATE 파일 처리
             update_files = glob.glob(os.path.join(QUEUE_DIR, "UPDATE_DATA*.json"))
             for path in update_files:
                 file_name = os.path.basename(path)
