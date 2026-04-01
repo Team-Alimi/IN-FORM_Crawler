@@ -9,31 +9,32 @@ class TypeCCrawler(BaseCrawler):
         self.log(f"수집 시작 (기한: {self.limit.strftime('%Y-%m-%d')})", "START")
         for tid in [1, 3, 4]:
             self.log(f"Tab {tid} 진입...", "START")
-            p_num, streak, prev_tits = 1, 0, []
+            page_num, streak, prev_tits = 1, 0, []
             while True:
                 sep = '&' if '?' in self.url else '?'
-                url = f"{self.url}{sep}cate={tid}&page={p_num}"
+                url = f"{self.url}{sep}cate={tid}&page={page_num}"
                 if not await self.safe_goto(url): break
 
                 try:
                     await self.page.wait_for_selector('tbody tr', timeout=5000)
                 except: break
 
-                rows_locator = self.page.locator('tbody tr')
-                if await rows_locator.count() == 0: break
+                rows_loc = self.page.locator('tbody tr')
+                rows_count = await rows_loc.count()
+                if rows_count == 0: break
                 
                 curr_tits = [t.strip() for t in (await self.page.locator('td.subject a').all_inner_texts()) if t.strip()]
                 if curr_tits and curr_tits == prev_tits: break
                 prev_tits = curr_tits
 
-                for i in range(await rows_locator.count()):
+                for i in range(rows_count):
                     try:
                         row = self.page.locator(f'tbody tr >> nth={i}')
                         sub, reg = row.locator('td.subject'), row.locator('td.regdate')
                         if await sub.count() == 0 or await reg.count() == 0: continue
 
-                        tit_a, dt_s = sub.locator('a').first, reg.locator('span').first
-                        tit, dt_txt = (await tit_a.inner_text()).strip(), (await dt_s.inner_text()).strip()
+                        title_a, dt_s = sub.locator('a').first, reg.locator('span').first
+                        title, dt_txt = (await title_a.inner_text()).strip(), (await dt_s.inner_text()).strip()
                         if not dt_txt: dt_txt = await dt_s.get_attribute('title') or ""
 
                         dt_obj = parse_date_raw(dt_txt)
@@ -45,13 +46,13 @@ class TypeCCrawler(BaseCrawler):
                             continue
                         else: streak = 0
 
-                        uid_txt = (await row.locator('._artclTdNum').inner_text()).strip() if await row.locator('._artclTdNum').count() > 0 else f"T{tid}P{p_num}R{i}"
+                        art_num = (await row.locator('._artclTdNum').inner_text()).strip() if await row.locator('._artclTdNum').count() > 0 else f"T{tid}P{page_num}R{i}"
                         
-                        await tit_a.scroll_into_view_if_needed()
-                        await tit_a.click(timeout=5000)
+                        await title_a.scroll_into_view_if_needed()
+                        await title_a.click(timeout=5000)
                         await self.page.wait_for_timeout(2000)
                         
-                        await self.parse_detail(tit, dt_obj, tid, uid_txt)
+                        await self.parse_detail(title, dt_obj, tid, art_num)
                         
                         await self.page.go_back()
                         await self.page.wait_for_timeout(2000)
@@ -60,23 +61,23 @@ class TypeCCrawler(BaseCrawler):
                         await self.safe_goto(url); await self.page.wait_for_timeout(2000)
                 
                 if streak >= 20: break
-                p_num += 1
-                if p_num > 100: break
+                page_num += 1
+                if page_num > 100: break
 
-    async def parse_detail(self, title, dt_obj, tid, uid_txt):
+    async def parse_detail(self, title, dt_obj, tid, art_num):
         """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
-        loc = self.page.locator('.contents_wrap, .artclView')
-        if await loc.count() == 0: return
-        cnt = (await loc.first.inner_text()).strip()
+        view = self.page.locator('.contents_wrap, .artclView')
+        if await view.count() == 0: return
+        raw_html = (await view.first.inner_text()).strip()
         att = []
-        for img in await loc.locator('img').all():
+        for img in await view.locator('img').all():
             src = await img.get_attribute('src')
             if src: att.append({'attachment_url': await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)})
 
-        if not cnt and not att: return
+        if not raw_html and not att: return
         
         self.process_item({
-            'unique_id': f"{self.code}C{tid}N{uid_txt}", 'title': title, 'content': cnt,
+            'unique_id': f"{self.code}C{tid}N{art_num}", 'title': title, 'content': raw_html,
             'original_url': self.page.url, 'created_at': format_date_str(dt_obj),
             'updated_at': format_date_str(dt_obj), 
             'vendor_ids': [self.vendor_id], 

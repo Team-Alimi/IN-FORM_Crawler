@@ -32,26 +32,26 @@ class TypeBCrawler(BaseCrawler):
                     cols = row.locator('td')
                     if await cols.count() < 4: continue
 
-                    pinned = "공지" in (await row.locator('.label').first.inner_text()) if await row.locator('.label').count() > 0 else False
-                    tit, dt_txt = (await cols.nth(1).inner_text()).strip(), (await cols.nth(3).inner_text()).strip()
-                    uid = f"{self.code}{tot - off - i}"
+                    is_pinned = "공지" in (await row.locator('.label').first.inner_text()) if await row.locator('.label').count() > 0 else False
+                    title, dt_txt = (await cols.nth(1).inner_text()).strip(), (await cols.nth(3).inner_text()).strip()
+                    art_num = f"{self.code}{tot - page_num - i}"
                     dt_obj = parse_date_raw(dt_txt)
                     if dt_obj is None: continue
 
                     if dt_obj < self.limit:
-                        if not pinned:
+                        if not is_pinned:
                             streak += 1
                             if streak >= 20: self.log("기한 종료.", "STOP"); return
                         continue
                     else:
-                        if not pinned: streak = 0
+                        if not is_pinned: streak = 0
 
                     lnk = row.locator('td').nth(1).locator('a')
                     await lnk.scroll_into_view_if_needed()
                     await lnk.click(timeout=5000)
                     await self.page.wait_for_timeout(2000)
                     
-                    await self.parse_detail(tit, dt_obj, uid)
+                    await self.parse_detail(title, dt_obj, art_num)
                     
                     await self.page.go_back()
                     await self.page.wait_for_timeout(2000)
@@ -63,18 +63,18 @@ class TypeBCrawler(BaseCrawler):
             off += 10
             if off > 5000: break
 
-    async def parse_detail(self, title, dt_obj, uid):
+    async def parse_detail(self, title, dt_obj, art_num):
         """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
-        loc = self.page.locator('.board-view-cnt')
-        if await loc.count() == 0: return
-        cnt = (await loc.first.inner_text()).strip()
+        view = self.page.locator('.board-view-cnt')
+        if await view.count() == 0: return
+        raw_html = (await view.first.inner_text()).strip()
         att = []
-        for img in await loc.locator('img').all():
+        for img in await view.locator('img').all():
             src = await img.get_attribute('src')
             if src: att.append({'attachment_url': await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)})
 
         self.process_item({
-            'unique_id': uid, 'title': title, 'content': cnt,
+            'unique_id': art_num, 'title': title, 'content': raw_html,
             'original_url': self.page.url, 'created_at': format_date_str(dt_obj),
             'updated_at': format_date_str(dt_obj), 
             'vendor_ids': [self.vendor_id], 

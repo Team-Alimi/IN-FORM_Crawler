@@ -5,7 +5,7 @@ import asyncio
 import uuid
 from common.logger import log_status
 
-class TypeACrawler:
+class Scrapy:
     """Scrapy 실행 래퍼"""
     def __init__(self, site):
         self.site = site
@@ -42,6 +42,8 @@ class TypeACrawler:
                 except: pass
             return self.name, []
 
+TypeACrawler = Scrapy
+
 class TypeBCrawler:
     """Playwright Type B 래퍼"""
     def __init__(self, site): self.site = site
@@ -66,7 +68,16 @@ class TypeCCrawler:
             log_status(self.site['name'], f"임포트 또는 실행 오류: {e}", "ERROR")
             return self.site['name'], []
 
-TypeDCrawler = TypeCCrawler
+TypeDCrawler = Scrapy
+
 class TypeECrawler:
-    def __init__(self, site): pass
-    async def run(self): return "Type E", []
+    """Playwright Type E 래퍼"""
+    def __init__(self, site): self.site = site
+    async def run(self):
+        try:
+            from crawlers.playwright.type_e import TypeECrawler as InternalCrawler
+            crawler_inst = InternalCrawler(self.site)
+            return await crawler_inst.run()
+        except Exception as e:
+            log_status(self.site['name'], f"임포트 또는 실행 오류: {e}", "ERROR")
+            return self.site['name'], []

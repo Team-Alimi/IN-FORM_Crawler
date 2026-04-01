@@ -12,7 +12,7 @@ def get_limit_date():
 def parse_date_raw(date_text):
     """다양한 형식의 날짜 문자열을 datetime 객체로 변환하여 시스템 표준 형식을 유지함"""
     if not date_text: return None
-    date_text = date_text.strip()
+    date_text = date_text.strip().rstrip('.')
     formats = ['%Y.%m.%d', '%Y-%m-%d', '%Y.%m.%d %H:%M', '%Y/%m/%d']
     for fmt in formats:
         try:
