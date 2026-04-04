@@ -18,8 +18,8 @@ def _execute_load(cursor, data, mode="INSERT"):
             admin_status = article.get('admin_status', 'INSPECTED_YET')
             sql_article = """
                           INSERT INTO school_articles
-                          (title, content, start_date, due_date, created_at, updated_at, category_id, admin_status)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
+                          (title, content, start_date, due_date, created_at, updated_at, category_id, is_published, admin_status)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, 0, %s) \
                           """
             cursor.execute(sql_article, (
                 article.get('title'),
