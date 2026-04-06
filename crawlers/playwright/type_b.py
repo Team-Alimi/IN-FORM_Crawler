@@ -34,7 +34,7 @@ class TypeBCrawler(BaseCrawler):
 
                     is_pinned = "공지" in (await row.locator('.label').first.inner_text()) if await row.locator('.label').count() > 0 else False
                     title, dt_txt = (await cols.nth(1).inner_text()).strip(), (await cols.nth(3).inner_text()).strip()
-                    art_num = f"{self.code}{tot - page_num - i}"
+                    art_num = f"{self.code}{tot - off - i}"
                     dt_obj = parse_date_raw(dt_txt)
                     if dt_obj is None: continue
 
