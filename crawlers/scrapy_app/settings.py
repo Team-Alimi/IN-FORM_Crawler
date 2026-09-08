@@ -1,17 +1,18 @@
-import sys
 import os
+import sys
+
 import config
 
 # User Agent 설정
-sys.path.append(os.path.dirname(os.path.abspath('.')))
+sys.path.append(os.path.dirname(os.path.abspath(".")))
 
-BOT_NAME = 'informBot'
+BOT_NAME = "informBot"
 USER_AGENT = config.FINAL_USER_AGENT
 DEFAULT_REQUEST_HEADERS = config.COMMON_HEADERS
 
 # 스파이더 모듈 설정
-SPIDER_MODULES = ['crawlers.scrapy_app.spiders']
-NEWSPIDER_MODULE = 'crawlers.scrapy_app.spiders'
+SPIDER_MODULES = ["crawlers.scrapy_app.spiders"]
+NEWSPIDER_MODULE = "crawlers.scrapy_app.spiders"
 
 # robots.txt 규칙 준수 여부
 ROBOTSTXT_OBEY = False
@@ -30,7 +31,7 @@ TELNETCONSOLE_ENABLED = False
 
 # 아이템 파이프라인 설정
 ITEM_PIPELINES = {
-   'crawlers.scrapy_app.pipelines.ValidationPipeline': 300,
+    "crawlers.scrapy_app.pipelines.ValidationPipeline": 300,
 }
 
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"

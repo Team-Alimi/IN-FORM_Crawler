@@ -1,0 +1,25 @@
+{
+  "contract_version": "v11",
+  "new_record": {
+    "source_type": "SCHOOL",
+    "vendor_initial": "TST_VENDOR",
+    "external_key": "TST-1001",
+    "source_url": "https://example.invalid/notices/1001",
+    "title": "Synthetic crawler notice",
+    "content": "Synthetic non-production writer fixture.",
+    "start_date": "2026-09-01",
+    "due_date": "2026-09-30",
+    "published_at": null,
+    "category_code": "ETC",
+    "attachments": [
+      {
+        "file_url": "https://example.invalid/files/1001.pdf"
+      }
+    ]
+  },
+  "similarity": {
+    "score": 85.0,
+    "vendor_initial": "TST_VENDOR",
+    "external_key": "TST-CANDIDATE"
+  }
+}

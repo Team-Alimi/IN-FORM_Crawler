@@ -4,10 +4,11 @@
 *.swp
 *.swo
 
-# --- Python 캐시 ---
+# --- 캐시 ---
 __pycache__/
 *.py[cod]
 *$py.class
+.ruff_cache/
 
 # --- 환경변수 및 보안 ---
 .env
@@ -34,3 +35,15 @@ Thumbs.db
 # --- 테스트 환경 전용 ---
 docker-compose.yml
 blueprint/
+
+# --- 개발 환경 전용 ---
+.agents/
+.serena/
+.specify/
+specs/
+
+# --- Terraform local/runtime artifacts ---
+.terraform/
+*.tfstate*
+*.tfvars
+.terraform.lock.hcl

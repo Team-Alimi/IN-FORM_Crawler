@@ -27,9 +27,10 @@ INFORM은 인하대학교 학내의 다양한 동아리 정보와 이벤트를 �
 - **Upstage Solar Pro 3**: 수집된 게시글의 맥락을 분석하여 카테고리 분류 및 날짜(시작/종료일) 자동 추출
 
 ### 🔹 Infrastructure
-- **Compute**: GCP Compute Engine (Spot Instance)
-- **OS**: Ubuntu 24.04 LTS
-- **CI/CD**: GitHub Actions (SSH Deploy)
+- **Target Compute**: AWS EC2 Spot 기반의 일회성 Docker worker
+- **Business Data**: PostgreSQL (backend-owned Flyway schema)
+- **Durable State**: backend/platform이 소유하는 v11 durable-state/scheduler contract
+- **CI/CD**: 기존 workflow는 별도 cutover 승인 전까지 유지하며, 이 README는 배포 실행 권한을 부여하지 않음
 
 ## 📁 프로젝트 구조
 
@@ -80,10 +81,8 @@ IN-FORM_Crawler/
 
 ### 1. 데이터 명명 규칙
 - **객체 지칭**: 수집되는 데이터 단위는 항상 `article`로 지칭하며, 고유 ID는 `unique_id`를 사용합니다.
-- **출처 관리**: DB 정합성을 위해 단일 ID 대신 배열 구조를 사용합니다.
-  - `vendor_ids`: 정수형 배열 (예: `[1, 2]`)
-  - `vendor_urls`: 문자열 배열 (예: `["url1", "url2"]`)
-  - *ID 기준 오름차순으로 1:1 매칭 정렬*
+- **출처 관리**: v11 writer 입력의 source identity는 `vendor_initial`, `external_key`, `source_url`입니다.
+  DB surrogate ID, `vendor_ids`, `vendor_urls`는 crawler queue/history 계약이 아닙니다.
 
 ### 2. 주석 및 로깅 표준
 - **의도 중심 주석 (Why)**: "코드가 무엇을 하는지"보다 **"왜 이 로직이 필요한지"** 개발자의 의도를 한국어로 작성합니다.
@@ -128,25 +127,21 @@ pip install -r requirements.txt
 playwright install
 ```
 
-### ⚙️ 설정 (.env)
+### ⚙️ 런타임 설정
 
-**[배포 환경]**
-운영 서버 배포 시에는 **GitHub Actions**가 **GitHub Secrets** 값을 이용하여 `.env` 파일을 자동으로 생성합니다.
+배포 환경은 값이 아닌 런타임 권한과 주입 경로를 제공합니다. 자격 증명, DB host, bucket/prefix,
+AWS resource ID를 `.env`, source, queue, history, log에 저장하지 않습니다.
 
-**[로컬 개발 환경]**
-로컬 개발 환경에서는 프로젝트 루트에 `.env` 파일을 직접 생성해야 합니다.
+| 환경 변수 | 용도 | 기본값 |
+| --- | --- | --- |
+| `CRAWLER_HISTORY_DIR` | local history artifact 경로 | `data/history` |
+| `CRAWLER_QUEUE_DIR` | DB commit 전 local queue 경로 | `data/queue` |
+| `CRAWLER_LOG_DIR` | local file log 경로 | `log` |
+| `POSTGRES_SECRET_ID` | runtime database secret identifier | 없음; EC2 runtime role이 해석 |
+| `UPSTAGE_API_KEY` | 승인된 AI provider runtime key | 없음 |
 
-```ini
-# Database Config
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_local_password
-DB_NAME=informserver
-
-# UPSTAGE AI API (게시글 분류용)
-UPSTAGE_AI_API_KEY=your_api_key_here
-```
+`POSTGRES_SECRET_ID`가 가리키는 secret은 runtime에서만 읽습니다. 테스트는 fake resolver 또는
+비프로덕션 DSN injection을 사용하며 AWS 호출을 하지 않습니다.
 
 ### 🚀 실행
 
@@ -160,16 +155,32 @@ python main.py --type A
 python main.py --type B
 ```
 
+### 📦 Ephemeral container I/O와 종료 동작
+
+- Worker는 `CRAWLER_HISTORY_DIR`, `CRAWLER_QUEUE_DIR`, `CRAWLER_LOG_DIR`를 local mount 경로로
+  주입받을 수 있으며, 주입하지 않으면 위 표의 local default를 사용합니다.
+- crawler application은 S3/DynamoDB transport, durable lock, scheduler, Spot lifecycle을 직접
+  구현하지 않습니다. startup restore와 terminal persist는 backend/platform runtime boundary의
+  책임입니다.
+- 성공 순서는 local queue 생성 → PostgreSQL commit → queue cleanup → local history commit입니다.
+  DB failure는 queue를 남기고 history를 성공으로 기록하지 않습니다.
+- 정상 완료는 0으로, collector/AI/queue/database/history 오류는 non-zero로 종료되어 control
+  plane이 retry 여부를 판단할 수 있게 합니다. `SKIPPED_OVERLAP`과 Spot interruption의 상태 전이는
+  scheduler/Spot contract가 소유합니다.
+- stdout logging은 유지합니다. history, queue, file log에는 credential-bearing field와 inline
+  credential form이 기록되지 않아야 합니다.
+
 ### 🔄 CI/CD Pipeline
 
-이 프로젝트는 **GitHub Actions**를 사용하여 자동 배포됩니다.
+현재 workflow는 historical deployment behavior이며, v11 target deployment contract가 아닙니다.
+GCP cutover, image publication, SSH deployment, AWS resource mutation은 별도 명시 승인 없이는
+수행하지 않습니다.
 
-1. **Push**: `crawler` 브랜치에 코드가 푸시되면 워크플로우가 트리거됩니다.
-2. **Build**: Docker 이미지를 빌드하고 Docker Hub에 업로드합니다.
-3. **Deploy**:
-* 운영 서버(GCP Instance)에 SSH로 접속합니다.
-* GitHub Secrets에 저장된 환경 변수로 서버 내 `.env` 파일을 갱신합니다.
-* 최신 Docker 이미지를 Pull 받아 컨테이너를 재시작합니다.
+1. **Current workflow**: 현재 파일의 기존 동작은 migration 동안 변경하지 않습니다.
+2. **Build/publish**: immutable image build 또는 registry publication은 별도 승인과 검증이
+   필요한 P3 작업입니다.
+3. **Deploy/cutover**: GCP SSH 배포의 변경·제거·대체와 AWS deployment는 별도 승인 없이는
+   수행하지 않습니다.
 
 ## 🎯 개발 가이드
 
@@ -194,7 +205,11 @@ python main.py --type B
 | **`chore`** | **기타 자잘한 수정** | `.gitignore` 수정, 빌드 스크립트 수정 등 (소스코드 건드리지 않음) |
 | **`revert`** | **커밋 되돌리기** | 이전 커밋을 취소할 때 사용 |
 
-## 🔗 vendor_id 목록
+## 🔗 Legacy vendor_id 목록 (runtime contract 아님)
+
+> 아래 표는 historical reference일 뿐입니다. v11 crawler 구현이나 신규 seed/queue/history에는
+> 사용하지 마세요. 현재 authoritative vendor key와 category mapping은 versioned v11 contract를
+> 따릅니다.
 
 ### 학교/학과
 | 🆔 ID | 🏢 명칭 (Name) | 🔤 이니셜 (Code) | 🏷️ 타입 (Type) |

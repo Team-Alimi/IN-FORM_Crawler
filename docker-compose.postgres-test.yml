@@ -1,0 +1,37 @@
+# Test-only PostgreSQL target for P1 contract work.
+#
+# Build context is the minimal server-derived image input vendored in docker/postgres/.
+# Its bootstrap script creates pg_bigm plus the backend-defined inform_crawler login role and
+# basic CONNECT/USAGE only on an empty data directory. This Compose file neither adds v10 DDL,
+# table/column grants, triggers, or seed SQL nor authorizes its execution; those remain subject
+# to the backend/platform owner's approved versioned contract.
+
+name: inform-crawler-postgres-test
+
+services:
+  db:
+    profiles: ["postgres-test"]
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: ${INFORM_TEST_POSTGRES_DB:-inform}
+      POSTGRES_USER: ${INFORM_TEST_POSTGRES_ADMIN:-inform}
+      POSTGRES_PASSWORD: ${INFORM_TEST_POSTGRES_PASSWORD:?Set a test-only bootstrap administrator password}
+      CRAWLER_PASSWORD: ${INFORM_TEST_CRAWLER_PASSWORD:?Set a test-only inform_crawler password}
+    ports:
+      - "127.0.0.1:${INFORM_TEST_POSTGRES_PORT:-54329}:5432"
+    volumes:
+      - inform_crawler_postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: "no"
+
+volumes:
+  inform_crawler_postgres_test_data:
+    name: inform_crawler_postgres_test_data

@@ -1,0 +1,264 @@
+{
+  "Comment": "IN-FORM crawler: 3 new-worker attempts, 10m/30m delays, 90m warning, 120m hard timeout",
+  "StartAt": "PrepareAttempt",
+  "States": {
+    "PrepareAttempt": {
+      "Type": "Pass",
+      "Parameters": {
+        "Attempt.$": "$.Attempt",
+        "LaunchTemplateId.$": "$.LaunchTemplateId",
+        "LaunchTemplateVersion.$": "$.LaunchTemplateVersion",
+        "Overrides.$": "$.Overrides",
+        "WorkerDocumentName.$": "$.WorkerDocumentName",
+        "Simulation.$": "$.Simulation",
+        "RunUuid.$": "States.UUID()",
+        "PollCount": 0,
+        "WarningEmitted": false
+      },
+      "Next": "LaunchSpotWorker"
+    },
+    "LaunchSpotWorker": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:createFleet",
+      "Parameters": {
+        "Type": "instant",
+        "LaunchTemplateConfigs": [{
+          "LaunchTemplateSpecification": {
+            "LaunchTemplateId.$": "$.LaunchTemplateId",
+            "Version.$": "$.LaunchTemplateVersion"
+          },
+          "Overrides.$": "$.Overrides"
+        }],
+        "TargetCapacitySpecification": {
+          "TotalTargetCapacity": 1,
+          "DefaultTargetCapacityType": "spot",
+          "SpotTargetCapacity": 1
+        },
+        "SpotOptions": {
+          "AllocationStrategy": "price-capacity-optimized",
+          "MinTargetCapacity": 1,
+          "SingleInstanceType": false,
+          "SingleAvailabilityZone": false
+        }
+      },
+      "ResultPath": "$.Fleet",
+      "Catch": [{
+        "ErrorEquals": ["States.ALL"],
+        "ResultPath": "$.LaunchError",
+        "Next": "SetSpotCapacityFailure"
+      }],
+      "Next": "FleetHasInstance"
+    },
+    "FleetHasInstance": {
+      "Type": "Choice",
+      "Choices": [{
+        "Variable": "$.Fleet.Instances[0].InstanceIds[0]",
+        "IsPresent": true,
+        "Next": "ExtractWorker"
+      }],
+      "Default": "SetSpotCapacityFailure"
+    },
+    "ExtractWorker": {
+      "Type": "Pass",
+      "Parameters": {
+        "FleetId.$": "$.Fleet.FleetId",
+        "InstanceId.$": "$.Fleet.Instances[0].InstanceIds[0]"
+      },
+      "ResultPath": "$.Worker",
+      "Next": "WaitForSsm"
+    },
+    "WaitForSsm": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "SendWorkerCommand"
+    },
+    "SendWorkerCommand": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:sendCommand",
+      "Parameters": {
+        "DocumentName.$": "$.WorkerDocumentName",
+        "InstanceIds.$": "States.Array($.Worker.InstanceId)",
+        "TimeoutSeconds": 7200,
+        "Parameters": {
+          "RunUuid.$": "States.Array($.RunUuid)",
+          "Simulation.$": "States.Array($.Simulation)"
+        }
+      },
+      "ResultSelector": { "CommandId.$": "$.Command.CommandId" },
+      "ResultPath": "$.Ssm",
+      "Retry": [{
+        "ErrorEquals": ["Ssm.InvalidInstanceId", "Ssm.InternalServerError", "States.TaskFailed"],
+        "IntervalSeconds": 15,
+        "BackoffRate": 1.5,
+        "MaxAttempts": 20
+      }],
+      "Catch": [{
+        "ErrorEquals": ["States.ALL"],
+        "ResultPath": "$.CommandError",
+        "Next": "SetBootstrapFailure"
+      }],
+      "Next": "WaitForCommand"
+    },
+    "WaitForCommand": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "GetCommandResult"
+    },
+    "GetCommandResult": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:getCommandInvocation",
+      "Parameters": {
+        "CommandId.$": "$.Ssm.CommandId",
+        "InstanceId.$": "$.Worker.InstanceId"
+      },
+      "ResultPath": "$.Command",
+      "Retry": [{
+        "ErrorEquals": ["Ssm.InvocationDoesNotExist", "Ssm.InternalServerError"],
+        "IntervalSeconds": 10,
+        "BackoffRate": 1.5,
+        "MaxAttempts": 12
+      }],
+      "Catch": [{
+        "ErrorEquals": ["States.ALL"],
+        "ResultPath": "$.CommandError",
+        "Next": "SetBootstrapFailure"
+      }],
+      "Next": "CommandStatus"
+    },
+    "CommandStatus": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.Command.Status", "StringEquals": "Success", "Next": "ParseWorkerResult" },
+        { "Variable": "$.Command.Status", "StringEquals": "TimedOut", "Next": "SetTimeoutFailure" },
+        { "Variable": "$.Command.Status", "StringEquals": "Failed", "Next": "SetBootstrapFailure" },
+        { "Variable": "$.Command.Status", "StringEquals": "Cancelled", "Next": "SetBootstrapFailure" }
+      ],
+      "Default": "IncrementPollCount"
+    },
+    "IncrementPollCount": {
+      "Type": "Pass",
+      "Parameters": { "Value.$": "States.MathAdd($.PollCount, 1)" },
+      "ResultPath": "$.NextPollCount",
+      "Next": "ApplyPollCount"
+    },
+    "ApplyPollCount": {
+      "Type": "Pass",
+      "Parameters": {
+        "Attempt.$": "$.Attempt",
+        "LaunchTemplateId.$": "$.LaunchTemplateId",
+        "LaunchTemplateVersion.$": "$.LaunchTemplateVersion",
+        "Overrides.$": "$.Overrides",
+        "WorkerDocumentName.$": "$.WorkerDocumentName",
+        "Simulation.$": "$.Simulation",
+        "RunUuid.$": "$.RunUuid",
+        "Worker.$": "$.Worker",
+        "Ssm.$": "$.Ssm",
+        "PollCount.$": "$.NextPollCount.Value",
+        "WarningEmitted.$": "$.WarningEmitted"
+      },
+      "Next": "CheckAttemptClock"
+    },
+    "CheckAttemptClock": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.PollCount", "NumericGreaterThanEquals": 240, "Next": "SetTimeoutFailure" },
+        {
+          "And": [
+            { "Variable": "$.PollCount", "NumericGreaterThanEquals": 180 },
+            { "Variable": "$.WarningEmitted", "BooleanEquals": false }
+          ],
+          "Next": "MarkWarning"
+        }
+      ],
+      "Default": "WaitForCommand"
+    },
+    "MarkWarning": {
+      "Type": "Pass",
+      "Result": true,
+      "ResultPath": "$.WarningEmitted",
+      "Next": "WaitForCommand"
+    },
+    "ParseWorkerResult": {
+      "Type": "Pass",
+      "Parameters": { "Value.$": "States.StringToJson($.Command.StandardOutputContent)" },
+      "ResultPath": "$.WorkerResult",
+      "Next": "ClassifyWorkerResult"
+    },
+    "ClassifyWorkerResult": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.WorkerResult.Value.status", "StringEquals": "SUCCESS", "Next": "TerminateSuccess" },
+        { "Variable": "$.WorkerResult.Value.status", "StringEquals": "SKIPPED_OVERLAP", "Next": "TerminateOverlap" },
+        { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "SPOT_CAPACITY", "Next": "TerminateRetryable" },
+        { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "SPOT_INTERRUPTION", "Next": "TerminateRetryable" },
+        { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "BOOTSTRAP_TRANSIENT", "Next": "TerminateRetryable" },
+        { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "DB_CONNECTION_TRANSIENT", "Next": "TerminateRetryable" },
+        { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "S3_TRANSIENT", "Next": "TerminateRetryable" }
+      ],
+      "Default": "TerminateNonRetryable"
+    },
+    "SetSpotCapacityFailure": {
+      "Type": "Pass",
+      "Result": { "Value": { "status": "FAILED", "error_class": "SPOT_CAPACITY" } },
+      "ResultPath": "$.WorkerResult",
+      "Next": "RetryDecision"
+    },
+    "SetBootstrapFailure": {
+      "Type": "Pass",
+      "Result": { "Value": { "status": "FAILED", "error_class": "BOOTSTRAP_TRANSIENT" } },
+      "ResultPath": "$.WorkerResult",
+      "Next": "TerminateRetryable"
+    },
+    "SetTimeoutFailure": {
+      "Type": "Pass",
+      "Result": { "Value": { "status": "FAILED_TIMEOUT", "error_class": "FAILED_TIMEOUT" } },
+      "ResultPath": "$.WorkerResult",
+      "Next": "TerminateNonRetryable"
+    },
+    "TerminateSuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Parameters": { "InstanceIds.$": "States.Array($.Worker.InstanceId)" },
+      "ResultPath": "$.Termination",
+      "Next": "Succeeded"
+    },
+    "TerminateOverlap": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Parameters": { "InstanceIds.$": "States.Array($.Worker.InstanceId)" },
+      "ResultPath": "$.Termination",
+      "Next": "SkippedOverlap"
+    },
+    "TerminateRetryable": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Parameters": { "InstanceIds.$": "States.Array($.Worker.InstanceId)" },
+      "ResultPath": "$.Termination",
+      "Next": "RetryDecision"
+    },
+    "TerminateNonRetryable": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Parameters": { "InstanceIds.$": "States.Array($.Worker.InstanceId)" },
+      "ResultPath": "$.Termination",
+      "Next": "Failed"
+    },
+    "RetryDecision": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.Attempt", "NumericGreaterThanEquals": 3, "Next": "Failed" },
+        { "Variable": "$.Attempt", "NumericEquals": 1, "Next": "WaitTenMinutes" }
+      ],
+      "Default": "WaitThirtyMinutes"
+    },
+    "WaitTenMinutes": { "Type": "Wait", "Seconds": 600, "Next": "SetAttemptTwo" },
+    "SetAttemptTwo": { "Type": "Pass", "Result": 2, "ResultPath": "$.Attempt", "Next": "ClearSimulationTwo" },
+    "ClearSimulationTwo": { "Type": "Pass", "Result": "NONE", "ResultPath": "$.Simulation", "Next": "PrepareAttempt" },
+    "WaitThirtyMinutes": { "Type": "Wait", "Seconds": 1800, "Next": "SetAttemptThree" },
+    "SetAttemptThree": { "Type": "Pass", "Result": 3, "ResultPath": "$.Attempt", "Next": "ClearSimulationThree" },
+    "ClearSimulationThree": { "Type": "Pass", "Result": "NONE", "ResultPath": "$.Simulation", "Next": "PrepareAttempt" },
+    "Succeeded": { "Type": "Succeed" },
+    "SkippedOverlap": { "Type": "Succeed" },
+    "Failed": { "Type": "Fail", "Error": "CrawlerAttemptFailed", "Cause": "Non-retryable failure or retry budget exhausted" }
+  }
+}

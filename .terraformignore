@@ -1,0 +1,16 @@
+.git/
+.github/
+.agents/
+.specify/
+specs/
+tests/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.terraform/
+*.tfstate*
+*.tfvars
+.terraform.lock.hcl
+.env*
+*.log

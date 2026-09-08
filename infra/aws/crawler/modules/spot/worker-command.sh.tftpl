@@ -1,0 +1,362 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+
+readonly STATE_BUCKET='${state_bucket_name}'
+readonly STATE_PREFIX='${state_prefix}'
+readonly LOCK_TABLE='${lock_table_name}'
+readonly PARAMETER_NAMESPACE='${parameter_namespace}'
+readonly DATABASE_SECRET_ARN='${database_secret_arn}'
+readonly CRAWLER_IMAGE_REF='${crawler_image_ref}'
+readonly CRAWLER_GIT_SHA='${crawler_git_sha}'
+readonly RUN_UUID='{{ RunUuid }}'
+readonly SIMULATION='{{ Simulation }}'
+readonly LOCK_KEY='daily-crawler'
+readonly LEASE_SECONDS=1200
+readonly HEARTBEAT_SECONDS=300
+readonly HARD_TIMEOUT_SECONDS=7200
+readonly WARNING_SECONDS=5400
+readonly ATTEMPT_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+readonly RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%s' "$RUN_UUID" | tr -d '-' | cut -c1-8)"
+readonly ROOT_DIR="/opt/inform-crawler/runtime/$RUN_ID"
+readonly HISTORY_DIR="$ROOT_DIR/history"
+readonly QUEUE_DIR="$ROOT_DIR/queue"
+readonly LOG_DIR="$ROOT_DIR/logs"
+readonly CURRENT_JSON="$ROOT_DIR/current.json"
+readonly MANIFEST_JSON="$ROOT_DIR/manifest.json"
+readonly RUNTIME_ENV="$ROOT_DIR/runtime.env"
+readonly LOST_LEASE_FLAG="$ROOT_DIR/lost-lease"
+readonly INTERRUPTED_FLAG="$ROOT_DIR/interrupted"
+readonly TIMEOUT_FLAG="$ROOT_DIR/timeout"
+readonly CONTAINER_NAME="inform-crawler-$RUN_ID"
+
+GENERATION=''
+CURRENT_ETAG=''
+DB_COMMITTED=false
+HISTORY_COMMITTED=false
+HEARTBEAT_PID=''
+INTERRUPTION_PID=''
+TIMEOUT_PID=''
+WARNING_PID=''
+
+mkdir -p "$HISTORY_DIR" "$QUEUE_DIR" "$LOG_DIR"
+touch "$RUNTIME_ENV"
+chmod 0600 "$RUNTIME_ENV"
+
+emit_result() {
+  local status="$1"
+  local error_class="$2"
+  jq -cn --arg status "$status" --arg error_class "$error_class" --arg run_id "$RUN_ID" \
+    '{status:$status,error_class:$error_class,run_id:$run_id}'
+}
+
+lease_values() {
+  local now="$1"
+  local expires="$2"
+  jq -cn --arg owner "$RUN_ID" --argjson now "$now" --argjson expires "$expires" \
+    '{":owner":{S:$owner},":now":{N:($now|tostring)},":expires":{N:($expires|tostring)},":zero":{N:"0"},":one":{N:"1"}}'
+}
+
+acquire_lease() {
+  local now expires response error_file
+  now="$(date -u +%s)"
+  expires="$((now + LEASE_SECONDS))"
+  error_file="$ROOT_DIR/acquire-error"
+  if ! response="$(aws dynamodb update-item \
+      --table-name "$LOCK_TABLE" \
+      --key '{"lock_key":{"S":"daily-crawler"}}' \
+      --condition-expression 'attribute_not_exists(lock_key) OR lease_expires_at < :now' \
+      --update-expression 'SET owner_run_id=:owner, acquired_at=:now, heartbeat_at=:now, lease_expires_at=:expires, generation=if_not_exists(generation,:zero)+:one' \
+      --expression-attribute-values "$(lease_values "$now" "$expires")" \
+      --return-values ALL_NEW 2>"$error_file")"; then
+    if grep -q 'ConditionalCheckFailedException' "$error_file"; then
+      rm -f "$error_file"
+      emit_result SKIPPED_OVERLAP SKIPPED_OVERLAP
+      exit 0
+    fi
+    rm -f "$error_file"
+    emit_result FAILED BOOTSTRAP_TRANSIENT
+    exit 0
+  fi
+  rm -f "$error_file"
+  GENERATION="$(jq -r '.Attributes.generation.N' <<<"$response")"
+}
+
+owns_live_lease() {
+  local now response
+  now="$(date -u +%s)"
+  response="$(aws dynamodb get-item --consistent-read --table-name "$LOCK_TABLE" \
+    --key '{"lock_key":{"S":"daily-crawler"}}')"
+  jq -e --arg owner "$RUN_ID" --arg generation "$GENERATION" --argjson now "$now" \
+    '.Item.owner_run_id.S == $owner and .Item.generation.N == $generation and (.Item.lease_expires_at.N|tonumber) > $now' \
+    <<<"$response" >/dev/null
+}
+
+heartbeat_loop() {
+  while sleep "$HEARTBEAT_SECONDS"; do
+    local now expires values
+    now="$(date -u +%s)"
+    expires="$((now + LEASE_SECONDS))"
+    values="$(jq -cn --arg owner "$RUN_ID" --arg generation "$GENERATION" --argjson now "$now" --argjson expires "$expires" \
+      '{":owner":{S:$owner},":generation":{N:$generation},":now":{N:($now|tostring)},":expires":{N:($expires|tostring)}}')"
+    if ! aws dynamodb update-item --table-name "$LOCK_TABLE" \
+      --key '{"lock_key":{"S":"daily-crawler"}}' \
+      --condition-expression 'owner_run_id=:owner AND generation=:generation' \
+      --update-expression 'SET heartbeat_at=:now, lease_expires_at=:expires' \
+      --expression-attribute-values "$values" >/dev/null; then
+      touch "$LOST_LEASE_FLAG"
+      docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      return
+    fi
+  done
+}
+
+release_lease() {
+  [ -n "$GENERATION" ] || return 0
+  local values
+  values="$(jq -cn --arg owner "$RUN_ID" --arg generation "$GENERATION" \
+    '{":owner":{S:$owner},":generation":{N:$generation},":zero":{N:"0"},":empty":{S:""}}')"
+  aws dynamodb update-item --table-name "$LOCK_TABLE" \
+    --key '{"lock_key":{"S":"daily-crawler"}}' \
+    --condition-expression 'owner_run_id=:owner AND generation=:generation' \
+    --update-expression 'SET owner_run_id=:empty, heartbeat_at=:zero, lease_expires_at=:zero' \
+    --expression-attribute-values "$values" >/dev/null 2>&1 || true
+}
+
+interruption_loop() {
+  local token code
+  token="$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' \
+    http://169.254.169.254/latest/api/token || true)"
+  while sleep 5; do
+    [ -n "$token" ] || continue
+    code="$(curl -sS -o /dev/null -w '%%{http_code}' \
+      -H "X-aws-ec2-metadata-token: $token" \
+      http://169.254.169.254/latest/meta-data/spot/instance-action || true)"
+    if [ "$code" = 200 ]; then
+      touch "$INTERRUPTED_FLAG"
+      docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      return
+    fi
+  done
+}
+
+cleanup() {
+  [ -n "$HEARTBEAT_PID" ] && kill "$HEARTBEAT_PID" >/dev/null 2>&1 || true
+  [ -n "$INTERRUPTION_PID" ] && kill "$INTERRUPTION_PID" >/dev/null 2>&1 || true
+  [ -n "$TIMEOUT_PID" ] && kill "$TIMEOUT_PID" >/dev/null 2>&1 || true
+  [ -n "$WARNING_PID" ] && kill "$WARNING_PID" >/dev/null 2>&1 || true
+  release_lease
+  rm -f "$RUNTIME_ENV"
+}
+trap cleanup EXIT
+trap 'touch "$INTERRUPTED_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true' TERM INT
+
+(sleep "$WARNING_SECONDS"; printf '%s\n' 'crawler runtime reached the 90-minute warning threshold' >> "$LOG_DIR/worker.log") &
+WARNING_PID=$!
+(sleep "$HARD_TIMEOUT_SECONDS"; touch "$TIMEOUT_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true) &
+TIMEOUT_PID=$!
+
+restore_history() {
+  local pointer_error pointer_response history_prefix manifest_key success_key file_count index rel expected actual
+  pointer_error="$ROOT_DIR/current-error"
+  if ! pointer_response="$(aws s3api get-object --bucket "$STATE_BUCKET" \
+      --key "$${STATE_PREFIX}history/current.json" "$CURRENT_JSON" 2>"$pointer_error")"; then
+    if grep -Eq 'NoSuchKey|404|Not Found' "$pointer_error"; then
+      rm -f "$pointer_error"
+      return 0
+    fi
+    rm -f "$pointer_error"
+    emit_result FAILED S3_TRANSIENT
+    exit 0
+  fi
+  rm -f "$pointer_error"
+  CURRENT_ETAG="$(jq -er '.ETag' <<<"$pointer_response")"
+  history_prefix="$(jq -er '.history_prefix' "$CURRENT_JSON")"
+  manifest_key="$(jq -er '.manifest_key' "$CURRENT_JSON")"
+  success_key="$${history_prefix}_SUCCESS"
+  aws s3api head-object --bucket "$STATE_BUCKET" --key "$success_key" >/dev/null || return 1
+  aws s3api get-object --bucket "$STATE_BUCKET" --key "$manifest_key" "$MANIFEST_JSON" >/dev/null || return 1
+  jq -e --arg run_id "$(jq -r '.run_id' "$CURRENT_JSON")" \
+    '.contract_version=="v11" and .status=="SUCCESS" and .run_id==$run_id' "$MANIFEST_JSON" >/dev/null || return 1
+  file_count="$(jq '.history_files|length' "$MANIFEST_JSON")"
+  for ((index=0; index<file_count; index++)); do
+    rel="$(jq -r ".history_files[$index].path" "$MANIFEST_JSON")"
+    [[ "$rel" != /* && "$rel" != *..* ]] || return 1
+    mkdir -p "$(dirname "$HISTORY_DIR/$rel")"
+    aws s3api get-object --bucket "$STATE_BUCKET" --key "$${history_prefix}$rel" "$HISTORY_DIR/$rel" >/dev/null || return 1
+    expected="$(jq -r ".history_files[$index].sha256" "$MANIFEST_JSON")"
+    actual="$(sha256sum "$HISTORY_DIR/$rel" | cut -d' ' -f1)"
+    [ "$expected" = "$actual" ] || return 1
+  done
+}
+
+load_runtime_parameters() {
+  local env_value
+  env_value="$(aws ssm get-parameter --with-decryption \
+    --name "$PARAMETER_NAMESPACE/runtime-env" --query Parameter.Value --output text)" || return 1
+  printf '%s\n' "$env_value" > "$RUNTIME_ENV"
+  printf 'POSTGRES_SECRET_ID=%s\n' "$DATABASE_SECRET_ARN" >> "$RUNTIME_ENV"
+  printf 'CRAWLER_HISTORY_DIR=/runtime/history\nCRAWLER_QUEUE_DIR=/runtime/queue\nCRAWLER_LOG_DIR=/runtime/logs\n' >> "$RUNTIME_ENV"
+}
+
+prepare_image() {
+  docker pull "$CRAWLER_IMAGE_REF" >/dev/null
+}
+
+run_crawler() {
+  local crawler_type
+  for crawler_type in A B C D E; do
+    [ ! -f "$LOST_LEASE_FLAG" ] && [ ! -f "$INTERRUPTED_FLAG" ] && [ ! -f "$TIMEOUT_FLAG" ] || return 1
+    docker run --rm --name "$CONTAINER_NAME" --env-file "$RUNTIME_ENV" \
+      -v "$HISTORY_DIR:/runtime/history" -v "$QUEUE_DIR:/runtime/queue" -v "$LOG_DIR:/runtime/logs" \
+      "$CRAWLER_IMAGE_REF" --type "$crawler_type" 2>&1 | tee -a "$LOG_DIR/worker.log" >/dev/null || return 1
+    DB_COMMITTED=true
+    HISTORY_COMMITTED=true
+  done
+}
+
+build_manifest() {
+  local started_at db_at history_at published_at files_json file rel size digest
+  started_at="$ATTEMPT_STARTED_AT"
+  db_at="$started_at"
+  history_at="$started_at"
+  published_at="$started_at"
+  files_json='[]'
+  while IFS= read -r -d '' file; do
+    rel="$${file#$HISTORY_DIR/}"
+    size="$(stat -c %s "$file")"
+    digest="$(sha256sum "$file" | cut -d' ' -f1)"
+    files_json="$(jq -cn --argjson files "$files_json" --arg path "$rel" --argjson size "$size" --arg sha256 "$digest" \
+      '$files + [{path:$path,size_bytes:$size,sha256:$sha256}]')"
+  done < <(find "$HISTORY_DIR" -type f -print0 | sort -z)
+  jq -n --arg run_id "$RUN_ID" --arg previous_run_id "$(jq -r '.run_id // empty' "$CURRENT_JSON" 2>/dev/null || true)" \
+    --arg started_at "$started_at" --arg db_at "$db_at" --arg history_at "$history_at" --arg published_at "$published_at" \
+    --arg image_ref "$CRAWLER_IMAGE_REF" --arg git_sha "$CRAWLER_GIT_SHA" --argjson files "$files_json" \
+    '{contract_version:"v11",run_id:$run_id,previous_run_id:(if $previous_run_id=="" then null else $previous_run_id end),status:"SUCCESS",started_at:$started_at,db_committed_at:$db_at,history_committed_at:$history_at,published_at:$published_at,git_sha:$git_sha,image_ref:$image_ref,crawler_types:["A","B","C","D","E"],history_file_count:($files|length),history_files:$files}' \
+    > "$MANIFEST_JSON"
+}
+
+publish_history() {
+  local run_prefix current_prefix current_payload empty_file pointer_args file_count index rel expected_size actual_size
+  owns_live_lease || return 1
+  build_manifest || return 1
+  run_prefix="$${STATE_PREFIX}history/runs/$RUN_ID/"
+  current_prefix="$${STATE_PREFIX}history/current/$RUN_ID/"
+  aws s3 sync "$HISTORY_DIR/" "s3://$STATE_BUCKET/$run_prefix" --only-show-errors || return 1
+  aws s3api put-object --bucket "$STATE_BUCKET" --key "$${run_prefix}manifest.json" --body "$MANIFEST_JSON" >/dev/null || return 1
+  file_count="$(jq '.history_files|length' "$MANIFEST_JSON")"
+  for ((index=0; index<file_count; index++)); do
+    rel="$(jq -r ".history_files[$index].path" "$MANIFEST_JSON")"
+    expected_size="$(jq -r ".history_files[$index].size_bytes" "$MANIFEST_JSON")"
+    actual_size="$(aws s3api head-object --bucket "$STATE_BUCKET" --key "$${run_prefix}$rel" --query ContentLength --output text)" || return 1
+    [ "$expected_size" = "$actual_size" ] || return 1
+  done
+  empty_file="$ROOT_DIR/empty"
+  : > "$empty_file"
+  aws s3api put-object --bucket "$STATE_BUCKET" --key "$${run_prefix}_SUCCESS" --body "$empty_file" >/dev/null || return 1
+  aws s3 sync "s3://$STATE_BUCKET/$run_prefix" "s3://$STATE_BUCKET/$current_prefix" --only-show-errors || return 1
+  for ((index=0; index<file_count; index++)); do
+    rel="$(jq -r ".history_files[$index].path" "$MANIFEST_JSON")"
+    expected_size="$(jq -r ".history_files[$index].size_bytes" "$MANIFEST_JSON")"
+    actual_size="$(aws s3api head-object --bucket "$STATE_BUCKET" --key "$${current_prefix}$rel" --query ContentLength --output text)" || return 1
+    [ "$expected_size" = "$actual_size" ] || return 1
+  done
+  aws s3api head-object --bucket "$STATE_BUCKET" --key "$${current_prefix}manifest.json" >/dev/null || return 1
+  aws s3api put-object --bucket "$STATE_BUCKET" --key "$${current_prefix}_SUCCESS" --body "$empty_file" >/dev/null || return 1
+  owns_live_lease || return 1
+  current_payload="$ROOT_DIR/new-current.json"
+  jq -n --arg run_id "$RUN_ID" --arg history_prefix "$current_prefix" \
+    --arg manifest_key "$${current_prefix}manifest.json" --arg published_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg image_ref "$CRAWLER_IMAGE_REF" --arg git_sha "$CRAWLER_GIT_SHA" \
+    '{contract_version:"v11",run_id:$run_id,history_prefix:$history_prefix,manifest_key:$manifest_key,published_at:$published_at,git_sha:$git_sha,image_ref:$image_ref}' > "$current_payload"
+  if [ -n "$CURRENT_ETAG" ]; then
+    pointer_args=(--if-match "$CURRENT_ETAG")
+  else
+    pointer_args=(--if-none-match '*')
+  fi
+  aws s3api put-object --bucket "$STATE_BUCKET" --key "$${STATE_PREFIX}history/current.json" \
+    --body "$current_payload" "$${pointer_args[@]}" >/dev/null || return 1
+}
+
+persist_failure() {
+  local status="$1" error_class="$2" failed_at metadata key
+  failed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  metadata="$ROOT_DIR/failure-metadata.json"
+  jq -n --arg run_id "$RUN_ID" --arg status "$status" --arg error_class "$error_class" --arg started_at "$ATTEMPT_STARTED_AT" --arg failed_at "$failed_at" \
+    --arg image_ref "$CRAWLER_IMAGE_REF" --arg git_sha "$CRAWLER_GIT_SHA" --argjson db_committed "$DB_COMMITTED" --argjson history_committed "$HISTORY_COMMITTED" \
+    '{contract_version:"v11",run_id:$run_id,status:$status,error_class:$error_class,attempt_started_at:$started_at,failed_at:$failed_at,db_committed:$db_committed,history_committed:$history_committed,git_sha:$git_sha,image_ref:$image_ref,crawler_types:["A","B","C","D","E"],exit_code:1,error_summary:"sanitized control-plane classification"}' > "$metadata"
+  aws s3api put-object --bucket "$STATE_BUCKET" --key "$${STATE_PREFIX}failures/$RUN_ID/metadata.json" --body "$metadata" >/dev/null || true
+  aws s3 sync "$LOG_DIR/" "s3://$STATE_BUCKET/$${STATE_PREFIX}failures/$RUN_ID/logs/" --only-show-errors || true
+  aws s3 sync "$QUEUE_DIR/" "s3://$STATE_BUCKET/$${STATE_PREFIX}failures/$RUN_ID/queue/" --only-show-errors || true
+  for key in $(aws s3api list-objects-v2 --bucket "$STATE_BUCKET" --prefix "$${STATE_PREFIX}failures/$RUN_ID/queue/" --query 'Contents[].Key' --output text 2>/dev/null); do
+    aws s3api put-object-tagging --bucket "$STATE_BUCKET" --key "$key" --tagging 'TagSet=[{Key=ArtifactClass,Value=queue}]' >/dev/null || true
+  done
+}
+
+acquire_lease
+heartbeat_loop & HEARTBEAT_PID=$!
+interruption_loop & INTERRUPTION_PID=$!
+if ! restore_history; then
+  persist_failure FAILED DURABLE_STATE_RESTORE_ERROR
+  emit_result FAILED DURABLE_STATE_RESTORE_ERROR
+  exit 0
+fi
+if ! load_runtime_parameters; then
+  persist_failure FAILED BOOTSTRAP_TRANSIENT
+  emit_result FAILED BOOTSTRAP_TRANSIENT
+  exit 0
+fi
+
+case "$SIMULATION" in
+  BOOTSTRAP_TRANSIENT|DB_CONNECTION_TRANSIENT)
+    persist_failure FAILED "$SIMULATION"
+    emit_result FAILED "$SIMULATION"
+    exit 0
+    ;;
+  SPOT_INTERRUPTION)
+    (sleep 5; touch "$INTERRUPTED_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true) &
+    ;;
+  TIMEOUT)
+    (sleep 5; touch "$TIMEOUT_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true) &
+    ;;
+esac
+
+if ! prepare_image; then
+  persist_failure FAILED BOOTSTRAP_TRANSIENT
+  emit_result FAILED BOOTSTRAP_TRANSIENT
+  exit 0
+fi
+
+if ! run_crawler; then
+  if [ -f "$INTERRUPTED_FLAG" ]; then
+    persist_failure INTERRUPTED SPOT_INTERRUPTION
+    emit_result INTERRUPTED SPOT_INTERRUPTION
+  elif [ -f "$LOST_LEASE_FLAG" ]; then
+    persist_failure FAILED STATE_CONFLICT
+    emit_result FAILED STATE_CONFLICT
+  elif [ -f "$TIMEOUT_FLAG" ]; then
+    persist_failure FAILED_TIMEOUT FAILED_TIMEOUT
+    emit_result FAILED_TIMEOUT FAILED_TIMEOUT
+  else
+    persist_failure FAILED DETERMINISTIC_APPLICATION_ERROR
+    emit_result FAILED DETERMINISTIC_APPLICATION_ERROR
+  fi
+  exit 0
+fi
+
+if [ "$SIMULATION" = S3_TRANSIENT ]; then
+  persist_failure FAILED S3_TRANSIENT
+  emit_result FAILED S3_TRANSIENT
+  exit 0
+fi
+
+if ! publish_history; then
+  persist_failure FAILED S3_TRANSIENT
+  emit_result FAILED S3_TRANSIENT
+  exit 0
+fi
+
+aws s3 sync "$LOG_DIR/" "s3://$STATE_BUCKET/$${STATE_PREFIX}logs/$(date -u +%Y/%m/%d)/$RUN_ID/" --only-show-errors
+rm -rf "$QUEUE_DIR"/*
+emit_result SUCCESS NONE

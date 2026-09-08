@@ -1,0 +1,11 @@
+output "runtime_role_arn" { value = aws_iam_role.runtime.arn }
+output "runtime_instance_profile_name" { value = aws_iam_instance_profile.runtime.name }
+output "orchestration_role_arn" { value = aws_iam_role.orchestration.arn }
+output "orchestration_role_name" { value = aws_iam_role.orchestration.name }
+output "scheduler_role_arn" { value = aws_iam_role.scheduler.arn }
+output "scheduler_role_name" { value = aws_iam_role.scheduler.name }
+output "runtime_instance_profile_arn" { value = aws_iam_instance_profile.runtime.arn }
+output "orchestration_role_name" { value = aws_iam_role.orchestration.name }
+output "orchestration_role_arn" { value = aws_iam_role.orchestration.arn }
+output "scheduler_role_name" { value = aws_iam_role.scheduler.name }
+output "scheduler_role_arn" { value = aws_iam_role.scheduler.arn }

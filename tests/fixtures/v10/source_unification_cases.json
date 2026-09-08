@@ -1,0 +1,63 @@
+{
+  "mapping_manifest": ".agents/docs/contracts/v10-crawler-mapping-manifest.md",
+  "cases": [
+    {
+      "name": "same_source_retry_uses_one_stable_identity",
+      "records": [
+        {
+          "unique_id": "CHM178913",
+          "vendor_initial": "CHM",
+          "source_type": "SCHOOL",
+          "external_key": "CHM178913",
+          "source_url": "https://source.example.test/notices/178913",
+          "site_name": "Synthetic chemistry source",
+          "title": "Stable notice",
+          "content": "Same source retry body",
+          "created_at": "2026-01-15",
+          "attachments": []
+        },
+        {
+          "unique_id": "CHM178913",
+          "vendor_initial": "CHM",
+          "source_type": "SCHOOL",
+          "external_key": "CHM178913",
+          "source_url": "https://source.example.test/board/view?article=178913",
+          "site_name": "Synthetic chemistry source",
+          "title": "Stable notice",
+          "content": "Same source retry body",
+          "created_at": "2026-01-16",
+          "attachments": []
+        }
+      ]
+    },
+    {
+      "name": "different_sources_are_not_collapsed_by_content_similarity",
+      "records": [
+        {
+          "unique_id": "CHM178913",
+          "vendor_initial": "CHM",
+          "source_type": "SCHOOL",
+          "external_key": "CHM178913",
+          "source_url": "https://source.example.test/notices/178913",
+          "site_name": "Synthetic chemistry source",
+          "title": "Shared notice",
+          "content": "Identical body",
+          "created_at": "2026-01-15",
+          "attachments": []
+        },
+        {
+          "unique_id": "SES1001",
+          "vendor_initial": "SES",
+          "source_type": "SCHOOL",
+          "external_key": "SES1001",
+          "source_url": "https://source.example.test/notices/1001",
+          "site_name": "Synthetic semiconductor source",
+          "title": "Shared notice",
+          "content": "Identical body",
+          "created_at": "2026-01-15",
+          "attachments": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 import re
+
+from common.utils import format_date_str, parse_date_raw
+
 from .base import BaseCrawler
-from common.utils import parse_date_raw, format_date_str
+
 
 class TypeBCrawler(BaseCrawler):
     """동적 웹 페이지(Type B)를 위한 Playwright 크롤러 구현체"""
@@ -12,47 +15,67 @@ class TypeBCrawler(BaseCrawler):
         while True:
             url = f"{self.url}?boardid=notice&offset={off}"
 
-            if not await self.safe_goto(url): break
-            
+            if not await self.safe_goto(url):
+                break
+
             try:
-                await self.page.wait_for_selector('tbody tr', timeout=5000)
+                await self.page.wait_for_selector("tbody tr", timeout=5000)
             except:
                 break
 
             tot = 0
-            t_elem = self.page.locator('.total-page')
+            t_elem = self.page.locator(".total-page")
             if await t_elem.count() > 0:
-                m = re.search(r'\d+', await t_elem.first.inner_text())
-                if m: tot = int(m.group())
+                m = re.search(r"\d+", await t_elem.first.inner_text())
+                if m:
+                    tot = int(m.group())
 
-            rows = await self.page.locator('tbody tr').all()
+            rows = await self.page.locator("tbody tr").all()
             for i in range(len(rows)):
                 try:
-                    row = self.page.locator(f'tbody tr >> nth={i}')
-                    cols = row.locator('td')
-                    if await cols.count() < 4: continue
+                    row = self.page.locator(f"tbody tr >> nth={i}")
+                    cols = row.locator("td")
+                    if await cols.count() < 4:
+                        continue
 
-                    is_pinned = "공지" in (await row.locator('.label').first.inner_text()) if await row.locator('.label').count() > 0 else False
-                    title, dt_txt = (await cols.nth(1).inner_text()).strip(), (await cols.nth(3).inner_text()).strip()
-                    art_num = f"{self.code}{tot - off - i}"
+                    is_pinned = (
+                        "공지" in (await row.locator(".label").first.inner_text())
+                        if await row.locator(".label").count() > 0
+                        else False
+                    )
+                    title, dt_txt = (
+                        (await cols.nth(1).inner_text()).strip(),
+                        (await cols.nth(3).inner_text()).strip(),
+                    )
                     dt_obj = parse_date_raw(dt_txt)
-                    if dt_obj is None: continue
+                    if dt_obj is None:
+                        continue
 
                     if dt_obj < self.limit:
                         if not is_pinned:
                             streak += 1
-                            if streak >= 20: self.log("기한 종료.", "STOP"); return
+                            if streak >= 20:
+                                self.log("기한 종료.", "STOP")
+                                return
                         continue
                     else:
-                        if not is_pinned: streak = 0
+                        if not is_pinned:
+                            streak = 0
 
-                    lnk = row.locator('td').nth(1).locator('a')
+                    native_post_id = None
+                    if not native_post_id:
+                        self.log(
+                            "source-native identifier unavailable; skipped", "WARN"
+                        )
+                        continue
+
+                    lnk = row.locator("td").nth(1).locator("a")
                     await lnk.scroll_into_view_if_needed()
                     await lnk.click(timeout=5000)
                     await self.page.wait_for_timeout(2000)
-                    
-                    await self.parse_detail(title, dt_obj, art_num)
-                    
+
+                    await self.parse_detail(title, dt_obj, native_post_id)
+
                     await self.page.go_back()
                     await self.page.wait_for_timeout(2000)
                 except Exception as e:
@@ -61,23 +84,42 @@ class TypeBCrawler(BaseCrawler):
                     await self.page.wait_for_timeout(2000)
 
             off += 10
-            if off > 5000: break
+            if off > 5000:
+                break
 
-    async def parse_detail(self, title, dt_obj, art_num):
+    async def parse_detail(self, title, dt_obj, native_post_id):
         """상세 페이지에서 본문 및 첨부파일을 추출하고 부모 클래스의 정제 로직 호출"""
-        view = self.page.locator('.board-view-cnt')
-        if await view.count() == 0: return
+        view = self.page.locator(".board-view-cnt")
+        if await view.count() == 0:
+            return
         raw_html = (await view.first.inner_text()).strip()
         att = []
-        for img in await view.locator('img').all():
-            src = await img.get_attribute('src')
-            if src: att.append({'attachment_url': await self.page.evaluate(f"(src) => new URL(src, document.baseURI).href", src)})
+        for img in await view.locator("img").all():
+            src = await img.get_attribute("src")
+            if src:
+                att.append(
+                    {
+                        "attachment_url": await self.page.evaluate(
+                            "(src) => new URL(src, document.baseURI).href", src
+                        )
+                    }
+                )
 
-        self.process_item({
-            'unique_id': art_num, 'title': title, 'content': raw_html,
-            'original_url': self.page.url, 'created_at': format_date_str(dt_obj),
-            'updated_at': format_date_str(dt_obj), 
-            'vendor_ids': [self.vendor_id], 
-            'vendor_urls': [self.page.url],
-            'attachments': att
-        })
+        try:
+            source_identity = self.build_source_identity(native_post_id, self.page.url)
+        except ValueError:
+            self.log("source-native identifier unavailable; skipped", "WARN")
+            return
+
+        self.process_item(
+            {
+                "unique_id": source_identity["external_key"],
+                "title": title,
+                "content": raw_html,
+                "original_url": source_identity["source_url"],
+                "created_at": format_date_str(dt_obj),
+                "updated_at": format_date_str(dt_obj),
+                "attachments": att,
+                **source_identity,
+            }
+        )

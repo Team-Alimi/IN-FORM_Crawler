@@ -1,11 +1,33 @@
-import os
-import time
 import logging
+import os
+import sys
+import time
 from datetime import datetime
 
+from common.redaction import sanitize_log_message
 from config import LOG_DIR
 
 _logger = None
+
+
+class _EncodingSafeStream:
+    """Write status logs even when the host console cannot encode status icons."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, value):
+        try:
+            return self._stream.write(value)
+        except UnicodeEncodeError:
+            encoding = getattr(self._stream, "encoding", None) or "utf-8"
+            fallback = value.encode(encoding, errors="backslashreplace").decode(
+                encoding
+            )
+            return self._stream.write(fallback)
+
+    def flush(self):
+        return self._stream.flush()
 
 
 def init_logger(crawler_type="default"):
@@ -19,7 +41,9 @@ def init_logger(crawler_type="default"):
     _logger = logging.getLogger(f"INFORM_Crawler_{crawler_type}")
     _logger.setLevel(logging.INFO)
 
-    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
     type_log_dir = os.path.join(LOG_DIR, crawler_type)
     if not os.path.exists(type_log_dir):
@@ -40,13 +64,14 @@ def init_logger(crawler_type="default"):
     file_name = f"{crawler_type}{current_time}.log"
     file_path = os.path.join(type_log_dir, file_name)
 
-    file_handler = logging.FileHandler(file_path, encoding='utf-8')
+    file_handler = logging.FileHandler(file_path, encoding="utf-8")
     file_handler.setFormatter(formatter)
     _logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    _logger.addHandler(console_handler)
+    stdout_handler = logging.StreamHandler(_EncodingSafeStream(sys.stdout))
+    stdout_handler.setFormatter(formatter)
+    _logger.addHandler(stdout_handler)
+    _logger.propagate = False
 
     return _logger
 
@@ -64,7 +89,7 @@ def get_status_icon(level="INFO"):
         "INFO": "📄",
         "LINK": "🔗",
         "PHASE": "⚙️",
-        "DONE": "🎉"
+        "DONE": "🎉",
     }
     return icons.get(level.upper(), "📄")
 
@@ -76,7 +101,7 @@ def log_status(site_name, message, level="INFO"):
         init_logger()
 
     icon = get_status_icon(level)
-    formatted_message = f"{icon} [{site_name}] {message}"
+    formatted_message = f"{icon} [{site_name}] {sanitize_log_message(message)}"
 
     upper_level = level.upper()
     if upper_level in ["ERROR", "STOP"]:

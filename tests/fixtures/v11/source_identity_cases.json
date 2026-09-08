@@ -1,0 +1,58 @@
+{
+  "mapping_contract": ".agents/docs/contracts/v11-backend-flyway-crawler-contract.md",
+  "approval_reference": "Project owner decision 2026-09-08",
+  "canonical_categories": [
+    "ACADEMIC",
+    "ACTIVITY",
+    "CAREER",
+    "CERTIFICATION",
+    "CONTEST",
+    "EVENT",
+    "FOREIGN",
+    "LECTURE",
+    "RESEARCH",
+    "SCHOLARSHIP",
+    "VOLUNTEER",
+    "ETC"
+  ],
+  "source_identity_cases": [
+    {
+      "name": "native_post_id_keeps_identity_when_url_changes",
+      "source_type": "SCHOOL",
+      "vendor_initial": "CHM",
+      "native_post_id": "178913",
+      "external_key": "CHM178913",
+      "source_urls": [
+        "https://source.example.test/notices/178913",
+        "https://source.example.test/board/view?article=178913"
+      ],
+      "category": "ACADEMIC",
+      "article_write_candidate": true
+    },
+    {
+      "name": "valid_uncategorized_notice_uses_etc",
+      "source_type": "SCHOOL",
+      "vendor_initial": "SSE",
+      "native_post_id": "2002",
+      "external_key": "SSE2002",
+      "source_urls": [
+        "https://source.example.test/notices/2002"
+      ],
+      "category": "ETC",
+      "article_write_candidate": true
+    },
+    {
+      "name": "pre_filter_excluded_before_ai_classification",
+      "source_type": "SCHOOL",
+      "vendor_initial": "SSE",
+      "native_post_id": "2003",
+      "external_key": "SSE2003",
+      "source_urls": [
+        "https://source.example.test/notices/2003"
+      ],
+      "pre_filter_excluded": true,
+      "article_write_candidate": false,
+      "rejection_reason": "source_keyword_filter"
+    }
+  ]
+}

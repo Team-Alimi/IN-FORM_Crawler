@@ -1,82 +1,48 @@
-name: Crawler CI/CD
+name: Crawler AWS Artifact CI
 
 on:
   push:
-    branches: [ "crawler" ]
+    branches: ["crawler"]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
-
-env:
-  IMAGE_NAME: ghcr.io/team-alimi/inform-crawler:latest
-  CONTAINER_NAME: inform-crawler
 
 jobs:
-  build-and-deploy:
+  verify-and-build:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Lowercase Image Name
-      run: |
-        echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Run offline tests
+        env:
+          INFORM_TEST_POSTGRES_DSN: ""
+          INFORM_TEST_CRAWLER_DSN: ""
+        run: python -m unittest discover -v
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ env.IMAGE_NAME }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Compile source
+        run: python -m compileall -q main.py config.py common dataprepper crawlers tests
 
-    - name: Deploy to GCP VM
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.HOST_IP }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_KEY }}
-        port: 22
-        envs: IMAGE_NAME, CONTAINER_NAME
-        script: |
-          # 1. 환경변수 파일(.env) 갱신
-          echo "[1/4] 최신 환경변수 파일(.env) 생성 중..."
-          mkdir -p /home/${{ secrets.SSH_USER }}/crawler
-          mkdir -p /home/${{ secrets.SSH_USER }}/crawler/data/history
-          mkdir -p /home/${{ secrets.SSH_USER }}/crawler/data/queue
-          ENV_PATH="/home/${{ secrets.SSH_USER }}/crawler/.env"
-          
-          rm -f $ENV_PATH
-          echo "DB_HOST=${{ secrets.DB_HOST }}" > $ENV_PATH
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $ENV_PATH
-          echo "DB_USER=root" >> $ENV_PATH
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $ENV_PATH
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $ENV_PATH
-          echo "UPSTAGE_AI_API_KEY=${{ secrets.UPSTAGE_AI_API_KEY }}" >> $ENV_PATH
-          chmod 600 $ENV_PATH
-          
-          # 2. 서버에서 GHCR 로그인
-          echo "[2/4] GHCR 로그인 중..."
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
-          # 3. 최신 이미지 다운로드
-          echo "[3/4] 최신 이미지 당겨오기..."
-          docker pull $IMAGE_NAME
-          
-          # 미사용 이미지 정리
-          docker image prune -f
-          
-          echo "✅ 배포 성공!"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build unpublished container image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: inform-crawler:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

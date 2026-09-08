@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y docker awscli2 curl jq
+systemctl enable --now docker
+systemctl enable --now amazon-ssm-agent
+
+install -d -m 0700 /opt/inform-crawler/runtime
+printf '%s\n' '${environment}' > /opt/inform-crawler/runtime/environment

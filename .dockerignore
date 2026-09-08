@@ -1,0 +1,29 @@
+# VCS and project workflow metadata
+.git/
+.github/
+.agents/
+.specify/
+specs/
+
+# Local environments, credentials, and editor state
+.env
+.env.*
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+
+# Generated Python and runtime state
+__pycache__/
+*.py[cod]
+*.egg-info/
+log/
+logs/
+data/history/
+data/queue/
+
+# Local-only verification artifacts
+tests/
+coverage/
+*.log

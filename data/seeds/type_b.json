@@ -1,16 +1,16 @@
 [
-    {
-        "type": "B",
-        "name": "이차전지공학(융합전공)",
-        "code": "IBF",
-        "url": "http://ibattery.website.ne.kr/sub/sub04_01.php",
-        "vendor_id": 28
-    },
-    {
-        "type": "B",
-        "name": "이차전지공학(융합전공)",
-        "code": "IBF",
-        "url": "http://ibattery.website.ne.kr/sub/sub04_02.php",
-        "vendor_id": 28
-    }
+  {
+    "type": "B",
+    "name": "이차전지공학(융합전공)",
+    "vendor_initial": "IBF",
+    "source_type": "SCHOOL",
+    "url": "http://ibattery.website.ne.kr/sub/sub04_01.php"
+  },
+  {
+    "type": "B",
+    "name": "이차전지공학(융합전공)",
+    "vendor_initial": "IBF",
+    "source_type": "SCHOOL",
+    "url": "http://ibattery.website.ne.kr/sub/sub04_02.php"
+  }
 ]

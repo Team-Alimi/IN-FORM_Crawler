@@ -1,7 +1,8 @@
 playwright
 scrapy
 scrapy-playwright
-pymysql
+psycopg[binary]
+boto3
 python-dateutil
 cryptography
 openai
