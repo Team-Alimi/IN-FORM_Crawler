@@ -17,7 +17,7 @@ resource "aws_security_group" "crawler" {
   description            = "Ephemeral crawler: no inbound rules"
   vpc_id                 = var.vpc_id
   revoke_rules_on_delete = true
-  tags                    = local.tags
+  tags                   = local.tags
 }
 
 resource "aws_vpc_security_group_egress_rule" "crawler_ipv4" {

@@ -149,9 +149,9 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             'schedule_expression          = "cron(0 6 * * ? *)"', self.scheduler
         )
         self.assertIn('schedule_expression_timezone = "Asia/Seoul"', self.scheduler)
-        self.assertIn(
-            'state                         = var.schedule_enabled ? "ENABLED" : "DISABLED"',
+        self.assertRegex(
             self.scheduler,
+            r'state\s*=\s*var\.schedule_enabled\s*\?\s*"ENABLED"\s*:\s*"DISABLED"',
         )
 
         definition = json.dumps(self.scheduler_definition, sort_keys=True)

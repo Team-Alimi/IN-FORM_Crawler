@@ -107,7 +107,7 @@ resource "aws_scheduler_schedule" "daily" {
   description                  = "Daily ephemeral IN-FORM crawler trigger"
   schedule_expression          = "cron(0 6 * * ? *)"
   schedule_expression_timezone = "Asia/Seoul"
-  state                         = var.schedule_enabled ? "ENABLED" : "DISABLED"
+  state                        = var.schedule_enabled ? "ENABLED" : "DISABLED"
 
   flexible_time_window { mode = "OFF" }
 
@@ -120,7 +120,7 @@ resource "aws_scheduler_schedule" "daily" {
       LaunchTemplateVersion = tostring(var.launch_template_version)
       Overrides             = local.fleet_overrides
       WorkerDocumentName    = var.worker_document_name
-      Simulation           = var.simulation
+      Simulation            = var.simulation
     })
 
     retry_policy {
