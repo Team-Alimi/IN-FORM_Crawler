@@ -204,35 +204,4 @@ switch ($Scenario) {
     }
 }
 
-Write-Host "Dev harness scenario '$Scenario' completed."
-
-Assert-DevInfrastructure
-
-$scenarios = if ($Scenario -eq 'All') {
-    @('Success', 'Overlap', 'LockExpiry', 'Heartbeat', 'TransientRetry', 'Timeout', 'SpotInterruption', 'CapacityFallback')
-} elseif ($Scenario -eq 'ValidateInfrastructure') { @() } else { @($Scenario) }
-
-foreach ($selected in $scenarios) {
-    switch ($selected) {
-        'Success' { Assert-ExecutionSucceeded | Out-Null }
-        'Overlap' {
-            $first = Start-DevExecution
-            $second = Start-DevExecution
-            $results = @((Wait-DevExecution $first), (Wait-DevExecution $second))
-            if (($results.output -join '') -notmatch 'SKIPPED_OVERLAP') { throw 'No overlap execution reported SKIPPED_OVERLAP.' }
-        }
-        'LockExpiry' { Test-LeasePrimitive -Expire }
-        'Heartbeat' { Test-LeasePrimitive -Heartbeat }
-        'TransientRetry' { Assert-ExecutionSucceeded -Simulation 'S3_TRANSIENT' | Out-Null }
-        'Timeout' { Assert-ExecutionSucceeded -Simulation 'TIMEOUT' | Out-Null }
-        'SpotInterruption' { Assert-ExecutionSucceeded -Simulation 'SPOT_INTERRUPTION' | Out-Null }
-        'CapacityFallback' {
-            $inputObject = (Get-ExecutionInput | ConvertFrom-Json -Depth 100)
-            $subnets = @($inputObject.Overrides.SubnetId | Sort-Object -Unique)
-            $types = @($inputObject.Overrides.InstanceType | Sort-Object -Unique)
-            if ($subnets.Count -lt 2 -or $types.Count -lt 2) { throw 'Candidate pool fallback requires >=2 subnets and >=2 instance types.' }
-        }
-    }
-}
-
 Write-Output "Dev harness scenario '$Scenario' completed without production access."

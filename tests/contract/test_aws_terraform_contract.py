@@ -285,6 +285,38 @@ class AwsDevHarnessContractTests(unittest.TestCase):
             harness, r'(?i)(password|token|secret)\s*=\s*["\'][^"\']+["\']'
         )
 
+    def test_each_harness_scenario_runs_once_with_consistent_timeout_result(
+        self,
+    ) -> None:
+        harness = read("harness/run-dev.ps1")
+        self.assertEqual(
+            1,
+            len(re.findall(r"(?m)^Assert-DevInfrastructure\s*$", harness)),
+        )
+        for scenario in (
+            "Success",
+            "Overlap",
+            "LockExpiry",
+            "Heartbeat",
+            "TransientRetry",
+            "Timeout",
+            "SpotInterruption",
+            "CapacityFallback",
+            "All",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assertEqual(
+                    1,
+                    len(
+                        re.findall(
+                            rf"(?m)^\s*'{scenario}'\s*\{{",
+                            harness,
+                        )
+                    ),
+                )
+        self.assertIn("Assert-ExecutionFailed -Simulation 'TIMEOUT'", harness)
+        self.assertNotIn("Assert-ExecutionSucceeded -Simulation 'TIMEOUT'", harness)
+
 
 if __name__ == "__main__":
     unittest.main()
