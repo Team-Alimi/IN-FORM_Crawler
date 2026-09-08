@@ -52,9 +52,14 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             "parameter_store_namespace",
             "ami_id",
             "crawler_image_ref",
+            "crawler_ecr_repository_arn",
         ):
             with self.subTest(variable=name):
                 self.assertRegex(variables, rf'variable\s+"{name}"')
+
+    def test_iam_outputs_are_unique(self) -> None:
+        output_names = re.findall(r'output\s+"([^"]+)"', read("modules/iam/outputs.tf"))
+        self.assertEqual(len(output_names), len(set(output_names)))
 
 
 class AwsDurableStateTerraformContractTests(unittest.TestCase):
@@ -217,6 +222,34 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
         ):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.iam)
+
+    def test_runtime_ecr_pull_is_repository_scoped_and_ephemeral(self) -> None:
+        self.assertRegex(
+            self.iam,
+            r'sid\s*=\s*"GetEcrAuthorizationToken"[\s\S]*?'
+            r'actions\s*=\s*\["ecr:GetAuthorizationToken"\][\s\S]*?'
+            r'resources\s*=\s*\["\*"\]',
+        )
+        for action in (
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:BatchGetImage",
+            "ecr:GetDownloadUrlForLayer",
+        ):
+            with self.subTest(action=action):
+                self.assertIn(action, self.iam)
+        self.assertIn("resources = [var.crawler_ecr_repository_arn]", self.iam)
+
+        worker = read("modules/spot/worker-command.sh.tftpl")
+        for fragment in (
+            "readonly AWS_REGION='${aws_region}'",
+            'export DOCKER_CONFIG="$ROOT_DIR/docker-config"',
+            'aws ecr get-login-password --region "$AWS_REGION"',
+            'docker login --username AWS --password-stdin "$registry"',
+            'docker pull "$CRAWLER_IMAGE_REF"',
+            'docker logout "$registry"',
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, worker)
 
         self.assertNotRegex(
             self.iam,

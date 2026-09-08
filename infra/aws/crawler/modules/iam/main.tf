@@ -84,6 +84,22 @@ data "aws_iam_policy_document" "runtime" {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [var.database_secret_arn]
   }
+
+  statement {
+    sid       = "GetEcrAuthorizationToken"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "PullApprovedCrawlerImage"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = [var.crawler_ecr_repository_arn]
+  }
 }
 
 resource "aws_iam_role_policy" "runtime" {

@@ -1,4 +1,5 @@
 variable "environment" { type = string }
+variable "aws_region" { type = string }
 variable "ami_id" { type = string }
 
 variable "subnet_ids" {

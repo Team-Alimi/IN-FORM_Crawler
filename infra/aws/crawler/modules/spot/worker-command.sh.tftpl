@@ -7,6 +7,7 @@ readonly STATE_PREFIX='${state_prefix}'
 readonly LOCK_TABLE='${lock_table_name}'
 readonly PARAMETER_NAMESPACE='${parameter_namespace}'
 readonly DATABASE_SECRET_ARN='${database_secret_arn}'
+readonly AWS_REGION='${aws_region}'
 readonly CRAWLER_IMAGE_REF='${crawler_image_ref}'
 readonly CRAWLER_GIT_SHA='${crawler_git_sha}'
 readonly RUN_UUID='{{ RunUuid }}'
@@ -20,6 +21,7 @@ readonly ATTEMPT_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 readonly RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%s' "$RUN_UUID" | tr -d '-' | cut -c1-8)"
 readonly ROOT_DIR="/opt/inform-crawler/runtime/$RUN_ID"
+export DOCKER_CONFIG="$ROOT_DIR/docker-config"
 readonly HISTORY_DIR="$ROOT_DIR/history"
 readonly QUEUE_DIR="$ROOT_DIR/queue"
 readonly LOG_DIR="$ROOT_DIR/logs"
@@ -40,7 +42,8 @@ INTERRUPTION_PID=''
 TIMEOUT_PID=''
 WARNING_PID=''
 
-mkdir -p "$HISTORY_DIR" "$QUEUE_DIR" "$LOG_DIR"
+mkdir -p "$HISTORY_DIR" "$QUEUE_DIR" "$LOG_DIR" "$DOCKER_CONFIG"
+chmod 0700 "$DOCKER_CONFIG"
 touch "$RUNTIME_ENV"
 chmod 0600 "$RUNTIME_ENV"
 
@@ -148,6 +151,7 @@ cleanup() {
   [ -n "$WARNING_PID" ] && kill "$WARNING_PID" >/dev/null 2>&1 || true
   release_lease
   rm -f "$RUNTIME_ENV"
+  rm -rf "$DOCKER_CONFIG"
 }
 trap cleanup EXIT
 trap 'touch "$INTERRUPTED_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true' TERM INT
@@ -201,7 +205,23 @@ load_runtime_parameters() {
 }
 
 prepare_image() {
-  docker pull "$CRAWLER_IMAGE_REF" >/dev/null
+  local registry
+  registry="$${CRAWLER_IMAGE_REF%%/*}"
+  if [ "$registry" = "$CRAWLER_IMAGE_REF" ]; then
+    return 1
+  fi
+  if ! aws ecr get-login-password --region "$AWS_REGION" |
+      docker login --username AWS --password-stdin "$registry" >>"$LOG_DIR/worker.log" 2>&1; then
+    rm -rf "$DOCKER_CONFIG"
+    return 1
+  fi
+  if ! docker pull "$CRAWLER_IMAGE_REF" >>"$LOG_DIR/worker.log" 2>&1; then
+    docker logout "$registry" >/dev/null 2>&1 || true
+    rm -rf "$DOCKER_CONFIG"
+    return 1
+  fi
+  docker logout "$registry" >/dev/null 2>&1 || true
+  rm -rf "$DOCKER_CONFIG"
 }
 
 run_crawler() {

@@ -22,7 +22,8 @@ allocation across at least two subnets and two x86_64 instance types.
 
 Environment identifiers belong in uncommitted `*.tfvars` files. Never store
 credentials or secret values here. `database_secret_arn` identifies the one
-approved Secrets Manager object; `crawler_image_ref` must be an immutable digest.
+approved Secrets Manager object; `crawler_image_ref` must be an immutable digest,
+and `crawler_ecr_repository_arn` scopes runtime pull access to that repository.
 
 ## Offline checks
 
