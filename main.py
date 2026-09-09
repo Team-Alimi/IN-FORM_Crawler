@@ -3,7 +3,6 @@ import asyncio
 import json
 import os
 import signal
-import sys
 
 from common.logger import init_logger, log_status
 from common.redaction import sanitize_runtime_artifact

@@ -9,6 +9,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import common
+import dataprepper
+import dataprepper.ai_engine
 import main as crawler_main
 
 
@@ -47,7 +50,7 @@ class ContainerInterruptionTests(unittest.TestCase):
                 interruption_event.set()
 
         with (
-            mock.patch.object(crawler_main.sys, "argv", ["main.py", "--type", "A"]),
+            mock.patch.object(sys, "argv", ["main.py", "--type", "A"]),
             mock.patch.object(crawler_main, "init_logger"),
             mock.patch.object(crawler_main, "log_status"),
             mock.patch.object(
@@ -58,6 +61,9 @@ class ContainerInterruptionTests(unittest.TestCase):
                 "run_crawler",
                 new=mock.AsyncMock(return_value=("site", [self.article()])),
             ),
+            mock.patch.object(dataprepper, "unifier", unifier_module, create=True),
+            mock.patch.object(dataprepper.ai_engine, "base", ai_module, create=True),
+            mock.patch.object(common, "db_loader", db_loader_module, create=True),
             mock.patch.dict(
                 sys.modules,
                 {

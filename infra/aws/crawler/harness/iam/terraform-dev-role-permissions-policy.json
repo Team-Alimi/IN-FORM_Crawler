@@ -51,6 +51,7 @@
         "s3:DeleteBucket",
         "s3:DeleteBucketPolicy",
         "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
         "s3:GetBucketLocation",
         "s3:GetBucketOwnershipControls",
         "s3:GetBucketPolicy",
@@ -192,21 +193,43 @@
       }
     },
     {
-      "Sid": "CreateTaggedDevCrawlerEc2Resources",
+      "Sid": "CreateTaggedDevCrawlerLaunchTemplate",
       "Effect": "Allow",
-      "Action": [
-        "ec2:CreateLaunchTemplate",
-        "ec2:CreateSecurityGroup"
-      ],
-      "Resource": [
-        "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:launch-template/*",
-        "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group/*",
-        "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:vpc/<VPC_ID>"
-      ],
+      "Action": "ec2:CreateLaunchTemplate",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:launch-template/*",
       "Condition": {
         "StringEquals": {
           "aws:RequestTag/Application": "inform-crawler",
           "aws:RequestTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedDevCrawlerSecurityGroup",
+      "Effect": "Allow",
+      "Action": "ec2:CreateSecurityGroup",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Application": "inform-crawler",
+          "aws:RequestTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "CreateDevCrawlerSecurityGroupInVpc",
+      "Effect": "Allow",
+      "Action": "ec2:CreateSecurityGroup",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:vpc/<VPC_ID>"
+    },
+    {
+      "Sid": "TagDevCrawlerSecurityGroupOnCreate",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": "CreateSecurityGroup"
         }
       }
     },
@@ -280,6 +303,7 @@
         "states:CreateStateMachine",
         "states:DeleteStateMachine",
         "states:DescribeStateMachine",
+        "states:ListStateMachineVersions",
         "states:ListTagsForResource",
         "states:TagResource",
         "states:UntagResource",

@@ -1,9 +1,14 @@
 """Red integration tests for orchestration failure visibility and persistence ordering."""
 
 import asyncio
+import sys
+import types
 import unittest
 from unittest import mock
 
+import common
+import dataprepper
+import dataprepper.ai_engine
 import main as crawler_main
 
 
@@ -38,27 +43,41 @@ class MainPersistenceOrderTests(unittest.TestCase):
         )
         ai = mock.Mock()
         ai.process.side_effect = ai_process or (lambda records: records)
+        unifier_module = types.ModuleType("dataprepper.unifier")
+        unifier_module.Unifier = mock.Mock(return_value=unifier)
+        ai_module = types.ModuleType("dataprepper.ai_engine.base")
+        ai_module.AI = mock.Mock(return_value=ai)
+        db_loader_module = types.ModuleType("common.db_loader")
+        db_loader_module.prepare_v11_queue_payload = lambda article: article
+        db_loader_module.load_json_to_db = mock.Mock(
+            side_effect=loader or (lambda: events.append("loader"))
+        )
         self.last_unifier = unifier
         self.last_events = events
 
         with (
-            mock.patch.object(crawler_main.sys, "argv", ["main.py", "--type", "A"]),
+            mock.patch.object(sys, "argv", ["main.py", "--type", "A"]),
             mock.patch.object(crawler_main, "init_logger"),
             mock.patch.object(crawler_main, "log_status"),
             mock.patch.object(
                 crawler_main, "load_sites", return_value=[{"type": "A", "name": "site"}]
             ),
             mock.patch.object(crawler_main, "run_crawler", new=run_crawler),
-            mock.patch("dataprepper.unifier.Unifier", return_value=unifier),
-            mock.patch("dataprepper.ai_engine.base.AI", return_value=ai),
+            mock.patch.object(dataprepper, "unifier", unifier_module, create=True),
+            mock.patch.object(dataprepper.ai_engine, "base", ai_module, create=True),
+            mock.patch.object(common, "db_loader", db_loader_module, create=True),
+            mock.patch.dict(
+                sys.modules,
+                {
+                    "dataprepper.unifier": unifier_module,
+                    "dataprepper.ai_engine.base": ai_module,
+                    "common.db_loader": db_loader_module,
+                },
+            ),
             mock.patch.object(
                 crawler_main,
                 "save_json",
                 side_effect=lambda *args: events.append("queue"),
-            ),
-            mock.patch(
-                "common.db_loader.load_json_to_db",
-                side_effect=loader or (lambda: events.append("loader")),
             ),
         ):
             asyncio.run(crawler_main.main())

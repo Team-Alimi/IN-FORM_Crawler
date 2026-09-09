@@ -16,6 +16,8 @@ from unittest import mock
 
 import psycopg
 
+import dataprepper
+import dataprepper.ai_engine
 import main as crawler_main
 from common import db_loader
 
@@ -303,7 +305,7 @@ class V11MainPersistenceOrderTests(unittest.TestCase):
         ai_module.AI = mock.Mock(return_value=ai)
 
         with (
-            mock.patch.object(crawler_main.sys, "argv", ["main.py", "--type", "A"]),
+            mock.patch.object(sys, "argv", ["main.py", "--type", "A"]),
             mock.patch.object(crawler_main, "init_logger"),
             mock.patch.object(crawler_main, "log_status"),
             mock.patch.object(
@@ -314,6 +316,8 @@ class V11MainPersistenceOrderTests(unittest.TestCase):
                 "run_crawler",
                 new=mock.AsyncMock(return_value=("site", [self.article()])),
             ),
+            mock.patch.object(dataprepper, "unifier", unifier_module, create=True),
+            mock.patch.object(dataprepper.ai_engine, "base", ai_module, create=True),
             mock.patch.dict(
                 sys.modules,
                 {

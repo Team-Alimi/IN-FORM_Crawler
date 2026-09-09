@@ -20,7 +20,9 @@ def read(relative_path: str) -> str:
 
 
 class AwsTerraformLayoutContractTests(unittest.TestCase):
-    def test_docker_build_context_excludes_local_and_infrastructure_artifacts(self) -> None:
+    def test_docker_build_context_excludes_local_and_infrastructure_artifacts(
+        self,
+    ) -> None:
         dockerignore = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8")
         entries = {
             line.strip().rstrip("/")
@@ -200,6 +202,53 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
         readme = read("harness/iam/README.md")
         self.assertRegex(readme, r"must not be applied without\s+explicit approval")
         self.assertRegex(readme, r"do not commit rendered physical\s+identifiers")
+
+    def test_dev_terraform_role_covers_provider_readback_actions(self) -> None:
+        permissions = json.loads(
+            read("harness/iam/terraform-dev-role-permissions-policy.json")
+        )
+        statements_by_sid = {
+            statement["Sid"]: statement for statement in permissions["Statement"]
+        }
+        actions_by_sid = {
+            statement["Sid"]: set(
+                statement["Action"]
+                if isinstance(statement["Action"], list)
+                else [statement["Action"]]
+            )
+            for statement in permissions["Statement"]
+        }
+
+        self.assertIn(
+            "ec2:CreateSecurityGroup",
+            actions_by_sid["CreateTaggedDevCrawlerSecurityGroup"],
+        )
+        self.assertEqual(
+            statements_by_sid["CreateTaggedDevCrawlerSecurityGroup"]["Resource"],
+            "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group/*",
+        )
+        self.assertEqual(
+            statements_by_sid["CreateDevCrawlerSecurityGroupInVpc"],
+            {
+                "Sid": "CreateDevCrawlerSecurityGroupInVpc",
+                "Effect": "Allow",
+                "Action": "ec2:CreateSecurityGroup",
+                "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:vpc/<VPC_ID>",
+            },
+        )
+        self.assertEqual(
+            statements_by_sid["TagDevCrawlerSecurityGroupOnCreate"]["Condition"],
+            {"StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"}},
+        )
+        self.assertNotIn("CreateTaggedDevCrawlerEc2Resources", statements_by_sid)
+        self.assertIn(
+            "s3:GetBucketCORS",
+            actions_by_sid["ManageDevCrawlerStateBucket"],
+        )
+        self.assertIn(
+            "states:ListStateMachineVersions",
+            actions_by_sid["ManageDevCrawlerStateMachine"],
+        )
 
     def test_dev_policy_renderer_is_local_and_non_mutating(self) -> None:
         renderer = read("harness/iam/render-dev-policies.ps1")
