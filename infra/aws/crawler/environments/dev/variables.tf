@@ -39,6 +39,7 @@ variable "state_prefix" {
 
 variable "parameter_store_namespace" { type = string }
 variable "database_secret_arn" { type = string }
+variable "crawler_ecr_repository_arn" { type = string }
 variable "ami_id" { type = string }
 
 variable "crawler_image_ref" {

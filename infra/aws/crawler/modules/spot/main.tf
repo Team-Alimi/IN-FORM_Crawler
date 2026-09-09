@@ -91,13 +91,14 @@ resource "aws_ssm_document" "worker" {
       inputs = {
         timeoutSeconds = "7500"
         runCommand = [templatefile("${path.module}/worker-command.sh.tftpl", {
-          crawler_git_sha          = var.crawler_git_sha
-          crawler_image_ref        = var.crawler_image_ref
-          database_secret_arn      = var.database_secret_arn
-          lock_table_name          = var.lock_table_name
-          parameter_namespace      = trimsuffix(var.parameter_store_namespace, "/")
-          state_bucket_name        = var.state_bucket_name
-          state_prefix             = var.state_prefix
+          aws_region          = var.aws_region
+          crawler_git_sha     = var.crawler_git_sha
+          crawler_image_ref   = var.crawler_image_ref
+          database_secret_arn = var.database_secret_arn
+          lock_table_name     = var.lock_table_name
+          parameter_namespace = trimsuffix(var.parameter_store_namespace, "/")
+          state_bucket_name   = var.state_bucket_name
+          state_prefix        = var.state_prefix
         })]
       }
     }]

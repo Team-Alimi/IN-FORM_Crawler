@@ -20,6 +20,28 @@ def read(relative_path: str) -> str:
 
 
 class AwsTerraformLayoutContractTests(unittest.TestCase):
+    def test_docker_build_context_excludes_local_and_infrastructure_artifacts(self) -> None:
+        dockerignore = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8")
+        entries = {
+            line.strip().rstrip("/")
+            for line in dockerignore.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        required_exclusions = {
+            ".git",
+            ".github",
+            ".agents",
+            ".specify",
+            ".playwright-mcp",
+            "specs",
+            "infra",
+            ".env*",
+            ".terraform",
+            "*.tfstate*",
+        }
+
+        self.assertTrue(required_exclusions.issubset(entries))
+
     def test_owner_approved_tree_is_present(self) -> None:
         required_paths = (
             "README.md",
@@ -32,6 +54,11 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             "environments/prod/main.tf",
             "harness/README.md",
             "harness/run-dev.ps1",
+            "harness/iam/README.md",
+            "harness/iam/publisher-assume-role-policy.json",
+            "harness/iam/render-dev-policies.ps1",
+            "harness/iam/terraform-dev-role-trust-policy.json",
+            "harness/iam/terraform-dev-role-permissions-policy.json",
         )
 
         for relative_path in required_paths:
@@ -52,9 +79,153 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             "parameter_store_namespace",
             "ami_id",
             "crawler_image_ref",
+            "crawler_ecr_repository_arn",
         ):
             with self.subTest(variable=name):
                 self.assertRegex(variables, rf'variable\s+"{name}"')
+
+    def test_environments_use_partial_s3_backend_with_native_lockfile(self) -> None:
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                versions = read(f"environments/{environment}/versions.tf")
+                self.assertIn(
+                    'required_version = ">= 1.10.0, < 2.0.0"',
+                    versions,
+                )
+                backend = re.search(
+                    r'backend\s+"s3"\s*\{(?P<body>.*?)\}',
+                    versions,
+                    re.DOTALL,
+                )
+                self.assertIsNotNone(backend)
+                body = backend.group("body")
+                self.assertRegex(body, r"\bencrypt\s*=\s*true")
+                self.assertRegex(body, r"\buse_lockfile\s*=\s*true")
+                for physical_setting in (
+                    "bucket",
+                    "key",
+                    "region",
+                    "profile",
+                    "role_arn",
+                ):
+                    self.assertNotRegex(body, rf"\b{physical_setting}\s*=")
+
+        readme = read("README.md")
+        self.assertIn('-backend-config="bucket=<terraform-state-bucket>"', readme)
+        self.assertIn("must not be the crawler durable-state bucket", readme)
+
+    def test_environment_provider_lockfiles_are_committed_and_consistent(self) -> None:
+        lockfiles = []
+        for environment in ("dev", "prod"):
+            with self.subTest(environment=environment):
+                lockfile = (
+                    IAC_ROOT / "environments" / environment / ".terraform.lock.hcl"
+                )
+                self.assertTrue(lockfile.is_file())
+                content = lockfile.read_text(encoding="utf-8")
+                self.assertIn('provider "registry.terraform.io/hashicorp/aws"', content)
+                self.assertRegex(content, r'\bversion\s*=\s*"\d+\.\d+\.\d+"')
+                lockfiles.append(content)
+
+        self.assertEqual(lockfiles[0], lockfiles[1])
+        gitignore_lines = {
+            line.strip()
+            for line in (REPO_ROOT / ".gitignore")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        }
+        self.assertNotIn(".terraform.lock.hcl", gitignore_lines)
+
+    def test_dev_terraform_role_handoff_is_scoped_and_template_only(self) -> None:
+        publisher = json.loads(read("harness/iam/publisher-assume-role-policy.json"))
+        trust = json.loads(read("harness/iam/terraform-dev-role-trust-policy.json"))
+        permissions = json.loads(
+            read("harness/iam/terraform-dev-role-permissions-policy.json")
+        )
+
+        self.assertEqual(
+            publisher["Statement"],
+            [
+                {
+                    "Sid": "AssumeInformCrawlerTerraformDevRole",
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRole",
+                    "Resource": (
+                        "arn:aws:iam::<AWS_ACCOUNT_ID>:role/"
+                        "inform-crawler-terraform-dev"
+                    ),
+                }
+            ],
+        )
+        self.assertEqual(
+            trust["Statement"][0]["Principal"]["AWS"],
+            "arn:aws:iam::<AWS_ACCOUNT_ID>:user/<ECR_PUBLISHER_USER_NAME>",
+        )
+        self.assertEqual(trust["Statement"][0]["Action"], "sts:AssumeRole")
+
+        actions = {
+            action
+            for statement in permissions["Statement"]
+            for action in (
+                statement["Action"]
+                if isinstance(statement["Action"], list)
+                else [statement["Action"]]
+            )
+        }
+        self.assertTrue(
+            all(
+                statement["Effect"] == "Allow" for statement in permissions["Statement"]
+            )
+        )
+        for required_action in (
+            "s3:GetObject",
+            "s3:PutObject",
+            "dynamodb:CreateTable",
+            "iam:CreateRole",
+            "iam:PassRole",
+            "ec2:CreateLaunchTemplate",
+            "ssm:CreateDocument",
+            "states:CreateStateMachine",
+            "scheduler:CreateSchedule",
+        ):
+            with self.subTest(required_action=required_action):
+                self.assertIn(required_action, actions)
+        self.assertNotIn("*", actions)
+        self.assertNotIn("secretsmanager:GetSecretValue", actions)
+        self.assertFalse(any(action.startswith("ecr:") for action in actions))
+
+        rendered = json.dumps([publisher, trust, permissions])
+        self.assertNotRegex(rendered, r"\b\d{12}\b")
+        self.assertNotIn("-prod", rendered)
+        readme = read("harness/iam/README.md")
+        self.assertRegex(readme, r"must not be applied without\s+explicit approval")
+        self.assertRegex(readme, r"do not commit rendered physical\s+identifiers")
+
+    def test_dev_policy_renderer_is_local_and_non_mutating(self) -> None:
+        renderer = read("harness/iam/render-dev-policies.ps1")
+        self.assertIn("aws sts get-caller-identity", renderer)
+        self.assertNotRegex(renderer, r"\baws\s+(?:iam|s3|s3api|ec2)\b")
+        self.assertIn("ConvertFrom-Json", renderer)
+        self.assertIn("INFORM_TFSTATE_BUCKET", renderer)
+        self.assertIn("INFORM_CRAWLER_STATE_BUCKET", renderer)
+        self.assertIn("INFORM_VPC_ID", renderer)
+        self.assertIn("INFORM_MAIN_DB_SG_ID", renderer)
+        self.assertIn('Join-Path $PSScriptRoot "rendered"', renderer)
+
+        gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("infra/aws/crawler/harness/iam/rendered/", gitignore)
+
+    def test_iam_outputs_are_unique(self) -> None:
+        output_names = re.findall(r'output\s+"([^"]+)"', read("modules/iam/outputs.tf"))
+        self.assertEqual(len(output_names), len(set(output_names)))
+
+    def test_modules_do_not_use_deprecated_aws_region_name(self) -> None:
+        for module in ("iam", "scheduler"):
+            with self.subTest(module=module):
+                self.assertNotIn(
+                    "data.aws_region.current.name",
+                    read(f"modules/{module}/main.tf"),
+                )
 
 
 class AwsDurableStateTerraformContractTests(unittest.TestCase):
@@ -144,9 +315,9 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             'schedule_expression          = "cron(0 6 * * ? *)"', self.scheduler
         )
         self.assertIn('schedule_expression_timezone = "Asia/Seoul"', self.scheduler)
-        self.assertIn(
-            'state                         = var.schedule_enabled ? "ENABLED" : "DISABLED"',
+        self.assertRegex(
             self.scheduler,
+            r'state\s*=\s*var\.schedule_enabled\s*\?\s*"ENABLED"\s*:\s*"DISABLED"',
         )
 
         definition = json.dumps(self.scheduler_definition, sort_keys=True)
@@ -218,6 +389,34 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.iam)
 
+    def test_runtime_ecr_pull_is_repository_scoped_and_ephemeral(self) -> None:
+        self.assertRegex(
+            self.iam,
+            r'sid\s*=\s*"GetEcrAuthorizationToken"[\s\S]*?'
+            r'actions\s*=\s*\["ecr:GetAuthorizationToken"\][\s\S]*?'
+            r'resources\s*=\s*\["\*"\]',
+        )
+        for action in (
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:BatchGetImage",
+            "ecr:GetDownloadUrlForLayer",
+        ):
+            with self.subTest(action=action):
+                self.assertIn(action, self.iam)
+        self.assertIn("resources = [var.crawler_ecr_repository_arn]", self.iam)
+
+        worker = read("modules/spot/worker-command.sh.tftpl")
+        for fragment in (
+            "readonly AWS_REGION='${aws_region}'",
+            'export DOCKER_CONFIG="$ROOT_DIR/docker-config"',
+            'aws ecr get-login-password --region "$AWS_REGION"',
+            'docker login --username AWS --password-stdin "$registry"',
+            'docker pull "$CRAWLER_IMAGE_REF"',
+            'docker logout "$registry"',
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, worker)
+
         self.assertNotRegex(
             self.iam,
             re.compile(r'(?s)resource\s+"aws_iam_role_policy"\s+"runtime".*?"ec2:\*"'),
@@ -251,6 +450,38 @@ class AwsDevHarnessContractTests(unittest.TestCase):
         self.assertNotRegex(
             harness, r'(?i)(password|token|secret)\s*=\s*["\'][^"\']+["\']'
         )
+
+    def test_each_harness_scenario_runs_once_with_consistent_timeout_result(
+        self,
+    ) -> None:
+        harness = read("harness/run-dev.ps1")
+        self.assertEqual(
+            1,
+            len(re.findall(r"(?m)^Assert-DevInfrastructure\s*$", harness)),
+        )
+        for scenario in (
+            "Success",
+            "Overlap",
+            "LockExpiry",
+            "Heartbeat",
+            "TransientRetry",
+            "Timeout",
+            "SpotInterruption",
+            "CapacityFallback",
+            "All",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assertEqual(
+                    1,
+                    len(
+                        re.findall(
+                            rf"(?m)^\s*'{scenario}'\s*\{{",
+                            harness,
+                        )
+                    ),
+                )
+        self.assertIn("Assert-ExecutionFailed -Simulation 'TIMEOUT'", harness)
+        self.assertNotIn("Assert-ExecutionSucceeded -Simulation 'TIMEOUT'", harness)
 
 
 if __name__ == "__main__":

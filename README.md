@@ -164,9 +164,12 @@ python main.py --type B
   책임입니다.
 - 성공 순서는 local queue 생성 → PostgreSQL commit → queue cleanup → local history commit입니다.
   DB failure는 queue를 남기고 history를 성공으로 기록하지 않습니다.
-- 정상 완료는 0으로, collector/AI/queue/database/history 오류는 non-zero로 종료되어 control
-  plane이 retry 여부를 판단할 수 있게 합니다. `SKIPPED_OVERLAP`과 Spot interruption의 상태 전이는
-  scheduler/Spot contract가 소유합니다.
+- 정상 완료는 `0`으로 종료합니다. 애플리케이션 오류는 승인된 `v11-runtime-exit-1` 계약에
+  따라 `65`(schema), `70`(deterministic), `75`(DB connection transient), `77`(authorization),
+  `78`(invalid configuration) 중 하나로 종료하며, 알 수 없는 non-zero 값은 재시도하지 않는
+  deterministic 오류로 처리합니다. `SKIPPED_OVERLAP`과 Spot interruption의 상태 전이는
+  scheduler/Spot contract가 소유합니다. 정확한 계약은
+  `.agents/docs/contracts/v11-INFORM_CRAWLER_RUNTIME_RESULT_CONTRACT.md`를 따릅니다.
 - stdout logging은 유지합니다. history, queue, file log에는 credential-bearing field와 inline
   credential form이 기록되지 않아야 합니다.
 

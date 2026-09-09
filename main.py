@@ -7,6 +7,11 @@ import sys
 
 from common.logger import init_logger, log_status
 from common.redaction import sanitize_runtime_artifact
+from common.runtime_result import (
+    RuntimeConfigurationError,
+    RuntimeExitCode,
+    classify_runtime_error,
+)
 from config import QUEUE_DIR, category_code_allows_write, load_sites
 from crawlers import (
     TypeACrawler,
@@ -72,7 +77,7 @@ async def main(interruption_event=None):
     targets = load_sites(typ)
     if not targets:
         log_status("System", f"대상 없음 또는 로드 실패: {typ}", "ERROR")
-        sys.exit(1)
+        raise RuntimeConfigurationError(f"no crawl targets configured for type {typ}")
 
     # === PHASE 1: 비동기 크롤링 수행 ===
     sem = asyncio.Semaphore(min(len(targets), 8))
@@ -196,9 +201,23 @@ async def run_cli():
             loop.remove_signal_handler(termination_signal)
 
 
-if __name__ == "__main__":
+def run_process():
+    """Return the stable application exit code consumed by the AWS worker."""
     try:
         asyncio.run(run_cli())
     except RuntimeInterruption as error:
         log_status("System", str(error), "ERROR")
-        raise SystemExit(1) from error
+        return RuntimeExitCode.DETERMINISTIC_APPLICATION_ERROR
+    except Exception as error:
+        exit_code = classify_runtime_error(error)
+        log_status(
+            "System",
+            f"crawler failed: {type(error).__name__}",
+            "ERROR",
+        )
+        return exit_code
+    return RuntimeExitCode.SUCCESS
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_process())

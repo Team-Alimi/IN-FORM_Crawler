@@ -8,7 +8,7 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
   })
-  parameter_arn = "arn:${data.aws_partition.current.partition}:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${trimsuffix(var.parameter_store_namespace, "/")}/*"
+  parameter_arn = "arn:${data.aws_partition.current.partition}:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter${trimsuffix(var.parameter_store_namespace, "/")}/*"
 }
 
 data "aws_iam_policy_document" "runtime_assume" {
@@ -83,6 +83,22 @@ data "aws_iam_policy_document" "runtime" {
     sid       = "ReadApprovedDatabaseSecret"
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [var.database_secret_arn]
+  }
+
+  statement {
+    sid       = "GetEcrAuthorizationToken"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "PullApprovedCrawlerImage"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = [var.crawler_ecr_repository_arn]
   }
 }
 

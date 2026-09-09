@@ -2,6 +2,7 @@ variable "environment" { type = string }
 variable "state_bucket_arn" { type = string }
 variable "lock_table_arn" { type = string }
 variable "database_secret_arn" { type = string }
+variable "crawler_ecr_repository_arn" { type = string }
 
 variable "parameter_store_namespace" {
   description = "Absolute SSM Parameter Store path, for example /inform/crawler/dev."

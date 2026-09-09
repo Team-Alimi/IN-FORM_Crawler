@@ -46,4 +46,5 @@ specs/
 .terraform/
 *.tfstate*
 *.tfvars
-.terraform.lock.hcl
+# Environment provider lockfiles are committed for reproducible installs.
+infra/aws/crawler/harness/iam/rendered/

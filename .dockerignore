@@ -14,6 +14,19 @@ env/
 .idea/
 .vscode/
 
+# Repository metadata, project instructions, specifications, and IaC are not
+# required by the crawler runtime image.
+.git/
+.github/
+.agents/
+.specify/
+.playwright-mcp/
+specs/
+infra/
+.env*
+.terraform/
+*.tfstate*
+
 # Generated Python and runtime state
 __pycache__/
 *.py[cod]

@@ -100,7 +100,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
     filter {
       and {
         prefix = "${local.key_prefix}failures/"
-        tags = { ArtifactClass = "queue" }
+        tags   = { ArtifactClass = "queue" }
       }
     }
     expiration { days = 30 }

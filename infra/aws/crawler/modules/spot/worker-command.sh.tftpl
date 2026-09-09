@@ -7,6 +7,7 @@ readonly STATE_PREFIX='${state_prefix}'
 readonly LOCK_TABLE='${lock_table_name}'
 readonly PARAMETER_NAMESPACE='${parameter_namespace}'
 readonly DATABASE_SECRET_ARN='${database_secret_arn}'
+readonly AWS_REGION='${aws_region}'
 readonly CRAWLER_IMAGE_REF='${crawler_image_ref}'
 readonly CRAWLER_GIT_SHA='${crawler_git_sha}'
 readonly RUN_UUID='{{ RunUuid }}'
@@ -20,6 +21,7 @@ readonly ATTEMPT_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 readonly RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%s' "$RUN_UUID" | tr -d '-' | cut -c1-8)"
 readonly ROOT_DIR="/opt/inform-crawler/runtime/$RUN_ID"
+export DOCKER_CONFIG="$ROOT_DIR/docker-config"
 readonly HISTORY_DIR="$ROOT_DIR/history"
 readonly QUEUE_DIR="$ROOT_DIR/queue"
 readonly LOG_DIR="$ROOT_DIR/logs"
@@ -39,8 +41,10 @@ HEARTBEAT_PID=''
 INTERRUPTION_PID=''
 TIMEOUT_PID=''
 WARNING_PID=''
+CRAWLER_EXIT_CODE=0
 
-mkdir -p "$HISTORY_DIR" "$QUEUE_DIR" "$LOG_DIR"
+mkdir -p "$HISTORY_DIR" "$QUEUE_DIR" "$LOG_DIR" "$DOCKER_CONFIG"
+chmod 0700 "$DOCKER_CONFIG"
 touch "$RUNTIME_ENV"
 chmod 0600 "$RUNTIME_ENV"
 
@@ -148,6 +152,7 @@ cleanup() {
   [ -n "$WARNING_PID" ] && kill "$WARNING_PID" >/dev/null 2>&1 || true
   release_lease
   rm -f "$RUNTIME_ENV"
+  rm -rf "$DOCKER_CONFIG"
 }
 trap cleanup EXIT
 trap 'touch "$INTERRUPTED_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true' TERM INT
@@ -201,16 +206,47 @@ load_runtime_parameters() {
 }
 
 prepare_image() {
-  docker pull "$CRAWLER_IMAGE_REF" >/dev/null
+  local registry
+  registry="$${CRAWLER_IMAGE_REF%%/*}"
+  if [ "$registry" = "$CRAWLER_IMAGE_REF" ]; then
+    return 1
+  fi
+  if ! aws ecr get-login-password --region "$AWS_REGION" |
+      docker login --username AWS --password-stdin "$registry" >>"$LOG_DIR/worker.log" 2>&1; then
+    rm -rf "$DOCKER_CONFIG"
+    return 1
+  fi
+  if ! docker pull "$CRAWLER_IMAGE_REF" >>"$LOG_DIR/worker.log" 2>&1; then
+    docker logout "$registry" >/dev/null 2>&1 || true
+    rm -rf "$DOCKER_CONFIG"
+    return 1
+  fi
+  docker logout "$registry" >/dev/null 2>&1 || true
+  rm -rf "$DOCKER_CONFIG"
+}
+
+map_application_exit_code() {
+  case "$1" in
+    65) printf 'SCHEMA_CONTRACT_ERROR\n' ;;
+    70) printf 'DETERMINISTIC_APPLICATION_ERROR\n' ;;
+    75) printf 'DB_CONNECTION_TRANSIENT\n' ;;
+    77) printf 'AUTHORIZATION_ERROR\n' ;;
+    78) printf 'INVALID_CONFIGURATION\n' ;;
+    *) printf 'DETERMINISTIC_APPLICATION_ERROR\n' ;;
+  esac
 }
 
 run_crawler() {
   local crawler_type
   for crawler_type in A B C D E; do
     [ ! -f "$LOST_LEASE_FLAG" ] && [ ! -f "$INTERRUPTED_FLAG" ] && [ ! -f "$TIMEOUT_FLAG" ] || return 1
+    set +e
     docker run --rm --name "$CONTAINER_NAME" --env-file "$RUNTIME_ENV" \
       -v "$HISTORY_DIR:/runtime/history" -v "$QUEUE_DIR:/runtime/queue" -v "$LOG_DIR:/runtime/logs" \
-      "$CRAWLER_IMAGE_REF" --type "$crawler_type" 2>&1 | tee -a "$LOG_DIR/worker.log" >/dev/null || return 1
+      "$CRAWLER_IMAGE_REF" --type "$crawler_type" 2>&1 | tee -a "$LOG_DIR/worker.log" >/dev/null
+    CRAWLER_EXIT_CODE="$${PIPESTATUS[0]}"
+    set -e
+    [ "$CRAWLER_EXIT_CODE" -eq 0 ] || return 1
     DB_COMMITTED=true
     HISTORY_COMMITTED=true
   done
@@ -280,12 +316,13 @@ publish_history() {
 }
 
 persist_failure() {
-  local status="$1" error_class="$2" failed_at metadata key
+  local status="$1" error_class="$2" exit_code="$${3:-1}" failed_at metadata key
   failed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   metadata="$ROOT_DIR/failure-metadata.json"
   jq -n --arg run_id "$RUN_ID" --arg status "$status" --arg error_class "$error_class" --arg started_at "$ATTEMPT_STARTED_AT" --arg failed_at "$failed_at" \
     --arg image_ref "$CRAWLER_IMAGE_REF" --arg git_sha "$CRAWLER_GIT_SHA" --argjson db_committed "$DB_COMMITTED" --argjson history_committed "$HISTORY_COMMITTED" \
-    '{contract_version:"v11",run_id:$run_id,status:$status,error_class:$error_class,attempt_started_at:$started_at,failed_at:$failed_at,db_committed:$db_committed,history_committed:$history_committed,git_sha:$git_sha,image_ref:$image_ref,crawler_types:["A","B","C","D","E"],exit_code:1,error_summary:"sanitized control-plane classification"}' > "$metadata"
+    --argjson exit_code "$exit_code" \
+    '{contract_version:"v11",run_id:$run_id,status:$status,error_class:$error_class,attempt_started_at:$started_at,failed_at:$failed_at,db_committed:$db_committed,history_committed:$history_committed,git_sha:$git_sha,image_ref:$image_ref,crawler_types:["A","B","C","D","E"],exit_code:$exit_code,error_summary:"sanitized control-plane classification"}' > "$metadata"
   aws s3api put-object --bucket "$STATE_BUCKET" --key "$${STATE_PREFIX}failures/$RUN_ID/metadata.json" --body "$metadata" >/dev/null || true
   aws s3 sync "$LOG_DIR/" "s3://$STATE_BUCKET/$${STATE_PREFIX}failures/$RUN_ID/logs/" --only-show-errors || true
   aws s3 sync "$QUEUE_DIR/" "s3://$STATE_BUCKET/$${STATE_PREFIX}failures/$RUN_ID/queue/" --only-show-errors || true
@@ -339,8 +376,9 @@ if ! run_crawler; then
     persist_failure FAILED_TIMEOUT FAILED_TIMEOUT
     emit_result FAILED_TIMEOUT FAILED_TIMEOUT
   else
-    persist_failure FAILED DETERMINISTIC_APPLICATION_ERROR
-    emit_result FAILED DETERMINISTIC_APPLICATION_ERROR
+    APPLICATION_ERROR_CLASS="$(map_application_exit_code "$CRAWLER_EXIT_CODE")"
+    persist_failure FAILED "$APPLICATION_ERROR_CLASS" "$CRAWLER_EXIT_CODE"
+    emit_result FAILED "$APPLICATION_ERROR_CLASS"
   fi
   exit 0
 fi
