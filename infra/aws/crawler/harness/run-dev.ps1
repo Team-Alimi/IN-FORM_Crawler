@@ -89,7 +89,7 @@ function Assert-DevInfrastructure {
 
     $definition = Invoke-AwsJson -Arguments @('stepfunctions', 'describe-state-machine', '--state-machine-arn', $DevStateMachineArn)
     if ($definition.definition -notmatch 'price-capacity-optimized') { throw 'Spot allocation contract is absent.' }
-    if ($definition.definition -notmatch '"Seconds":600' -or $definition.definition -notmatch '"Seconds":1800') {
+    if ($definition.definition -notmatch '"Seconds"\s*:\s*600' -or $definition.definition -notmatch '"Seconds"\s*:\s*1800') {
         throw 'Retry delays do not match the approved 10/30-minute contract.'
     }
 }
@@ -156,10 +156,12 @@ function Test-LeasePrimitive {
     }
 }
 
-function Assert-CapacityFallbackInput {
-    $inputObject = (Get-ExecutionInput | ConvertFrom-Json -Depth 100)
-    $subnets = @($inputObject.Overrides | ForEach-Object { $_.SubnetId } | Sort-Object -Unique)
-    $types = @($inputObject.Overrides | ForEach-Object { $_.InstanceType } | Sort-Object -Unique)
+function Assert-CapacityFallbackDefinition {
+    $stateMachine = Invoke-AwsJson -Arguments @('stepfunctions', 'describe-state-machine', '--state-machine-arn', $DevStateMachineArn)
+    $definition = $stateMachine.definition | ConvertFrom-Json -Depth 100
+    $overrides = @($definition.States.LaunchSpotWorker.Parameters.LaunchTemplateConfigs[0].Overrides)
+    $subnets = @($overrides | ForEach-Object { $_.SubnetId } | Sort-Object -Unique)
+    $types = @($overrides | ForEach-Object { $_.InstanceType } | Sort-Object -Unique)
     if ($subnets.Count -lt 2 -or $types.Count -lt 2) {
         throw 'Capacity fallback requires at least two subnets and two instance types.'
     }
@@ -192,9 +194,9 @@ switch ($Scenario) {
     'TransientRetry' { Assert-ExecutionSucceeded -Simulation 'S3_TRANSIENT' | Out-Null }
     'Timeout' { Assert-ExecutionFailed -Simulation 'TIMEOUT' }
     'SpotInterruption' { Assert-ExecutionSucceeded -Simulation 'SPOT_INTERRUPTION' | Out-Null }
-    'CapacityFallback' { Assert-CapacityFallbackInput }
+    'CapacityFallback' { Assert-CapacityFallbackDefinition }
     'All' {
-        Assert-CapacityFallbackInput
+        Assert-CapacityFallbackDefinition
         Test-LeasePrimitive -Expire
         Test-LeasePrimitive -Heartbeat
         Assert-ExecutionSucceeded | Out-Null

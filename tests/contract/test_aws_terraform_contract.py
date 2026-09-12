@@ -241,14 +241,94 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             statements_by_sid["TagDevCrawlerSecurityGroupOnCreate"]["Condition"],
             {"StringEquals": {"ec2:CreateAction": "CreateSecurityGroup"}},
         )
+        self.assertEqual(
+            statements_by_sid["TagDevCrawlerLaunchTemplateOnCreate"],
+            {
+                "Sid": "TagDevCrawlerLaunchTemplateOnCreate",
+                "Effect": "Allow",
+                "Action": "ec2:CreateTags",
+                "Resource": (
+                    "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:launch-template/*"
+                ),
+                "Condition": {
+                    "StringEquals": {
+                        "aws:RequestTag/Application": "inform-crawler",
+                        "aws:RequestTag/Environment": "dev",
+                        "ec2:CreateAction": "CreateLaunchTemplate",
+                    }
+                },
+            },
+        )
         self.assertNotIn("CreateTaggedDevCrawlerEc2Resources", statements_by_sid)
-        self.assertIn(
+        self.assertEqual(
+            statements_by_sid["AuthorizeTaggedDevCrawlerSecurityGroupRule"],
+            {
+                "Sid": "AuthorizeTaggedDevCrawlerSecurityGroupRule",
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:AuthorizeSecurityGroupIngress",
+                ],
+                "Resource": (
+                    "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group-rule/*"
+                ),
+                "Condition": {
+                    "StringEquals": {
+                        "aws:RequestTag/Application": "inform-crawler",
+                        "aws:RequestTag/Environment": "dev",
+                    }
+                },
+            },
+        )
+        self.assertEqual(
+            statements_by_sid["TagDevCrawlerSecurityGroupRuleOnCreate"],
+            {
+                "Sid": "TagDevCrawlerSecurityGroupRuleOnCreate",
+                "Effect": "Allow",
+                "Action": "ec2:CreateTags",
+                "Resource": (
+                    "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group-rule/*"
+                ),
+                "Condition": {
+                    "StringEquals": {
+                        "aws:RequestTag/Application": "inform-crawler",
+                        "aws:RequestTag/Environment": "dev",
+                        "ec2:CreateAction": [
+                            "AuthorizeSecurityGroupEgress",
+                            "AuthorizeSecurityGroupIngress",
+                        ],
+                    }
+                },
+            },
+        )
+        required_s3_readback_actions = {
+            "s3:GetAccelerateConfiguration",
             "s3:GetBucketCORS",
-            actions_by_sid["ManageDevCrawlerStateBucket"],
+            "s3:GetBucketLogging",
+            "s3:GetBucketObjectLockConfiguration",
+            "s3:GetBucketRequestPayment",
+            "s3:GetBucketWebsite",
+            "s3:GetReplicationConfiguration",
+        }
+        self.assertTrue(
+            required_s3_readback_actions.issubset(
+                actions_by_sid["ManageDevCrawlerStateBucket"]
+            )
         )
         self.assertIn(
             "states:ListStateMachineVersions",
             actions_by_sid["ManageDevCrawlerStateMachine"],
+        )
+        self.assertIn(
+            "ssm:DescribeDocumentPermission",
+            actions_by_sid["ManageDevWorkerDocument"],
+        )
+        self.assertEqual(
+            statements_by_sid["ManageDevWorkerDocument"]["Resource"],
+            (
+                "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:document/"
+                "inform-crawler-worker-dev"
+            ),
         )
 
     def test_dev_policy_renderer_is_local_and_non_mutating(self) -> None:
@@ -264,6 +344,67 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
 
         gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("infra/aws/crawler/harness/iam/rendered/", gitignore)
+
+    def test_dev_terraform_role_can_exercise_only_the_dev_harness(self) -> None:
+        permissions = json.loads(
+            read("harness/iam/terraform-dev-role-permissions-policy.json")
+        )
+        statements_by_sid = {
+            statement["Sid"]: statement for statement in permissions["Statement"]
+        }
+
+        self.assertEqual(
+            statements_by_sid["ReadDevDbDenialGuard"],
+            {
+                "Sid": "ReadDevDbDenialGuard",
+                "Effect": "Allow",
+                "Action": "ssm:GetParameter",
+                "Resource": (
+                    "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/"
+                    "inform/crawler/dev/PRODUCTION_DB_ACCESS_ALLOWED"
+                ),
+            },
+        )
+        self.assertEqual(
+            statements_by_sid["ExerciseDevRuntimeLock"],
+            {
+                "Sid": "ExerciseDevRuntimeLock",
+                "Effect": "Allow",
+                "Action": [
+                    "dynamodb:DeleteItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                ],
+                "Resource": (
+                    "arn:aws:dynamodb:<AWS_REGION>:<AWS_ACCOUNT_ID>:table/"
+                    "inform-crawler-runtime-lock-dev"
+                ),
+            },
+        )
+        self.assertEqual(
+            statements_by_sid["ExerciseDevCrawlerStateMachine"],
+            {
+                "Sid": "ExerciseDevCrawlerStateMachine",
+                "Effect": "Allow",
+                "Action": ["states:ListExecutions", "states:StartExecution"],
+                "Resource": (
+                    "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:"
+                    "inform-crawler-orchestration-dev"
+                ),
+            },
+        )
+        self.assertEqual(
+            statements_by_sid["ObserveAndStopDevCrawlerExecutions"],
+            {
+                "Sid": "ObserveAndStopDevCrawlerExecutions",
+                "Effect": "Allow",
+                "Action": ["states:DescribeExecution", "states:StopExecution"],
+                "Resource": (
+                    "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:execution:"
+                    "inform-crawler-orchestration-dev:*"
+                ),
+            },
+        )
 
     def test_iam_outputs_are_unique(self) -> None:
         output_names = re.findall(r'output\s+"([^"]+)"', read("modules/iam/outputs.tf"))
@@ -748,6 +889,11 @@ class AwsDevHarnessContractTests(unittest.TestCase):
                 )
         self.assertIn("Assert-ExecutionFailed -Simulation 'TIMEOUT'", harness)
         self.assertNotIn("Assert-ExecutionSucceeded -Simulation 'TIMEOUT'", harness)
+
+    def test_retry_delay_assertion_accepts_valid_json_whitespace(self) -> None:
+        harness = read("harness/run-dev.ps1")
+        self.assertIn(r"""'"Seconds"\s*:\s*600'""", harness)
+        self.assertIn(r"""'"Seconds"\s*:\s*1800'""", harness)
 
 
 if __name__ == "__main__":

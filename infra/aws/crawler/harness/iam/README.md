@@ -10,9 +10,10 @@ Terraform plan/apply, and executing the real harness are separate AWS mutation/a
 - The existing publisher user receives only `sts:AssumeRole` for the dev Terraform role.
 - The role trust policy names only that existing user. The role has no access key and no console
   password.
-- The role permission template covers the current dev Terraform resource types and the dev remote
-  state key. It deliberately excludes ECR actions, Secrets Manager value reads, production names,
-  and wildcard actions.
+- The role permission template covers the current dev Terraform resource types, the dev remote
+  state key, and only the data-plane/control-plane actions exercised by `run-dev.ps1` against the
+  named dev guard, lock table, state machine, and executions. It deliberately excludes ECR actions,
+  Secrets Manager value reads, production names, and wildcard actions.
 - Some AWS read APIs do not support resource-level permissions and therefore use `Resource: "*"`
   with a Region condition. This is not an `Action: "*"` grant.
 - This is a starting least-privilege policy for the current source. Do not broaden it in response to

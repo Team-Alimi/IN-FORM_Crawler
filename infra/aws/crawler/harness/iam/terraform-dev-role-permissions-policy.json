@@ -50,17 +50,23 @@
         "s3:CreateBucket",
         "s3:DeleteBucket",
         "s3:DeleteBucketPolicy",
+        "s3:GetAccelerateConfiguration",
         "s3:GetBucketAcl",
         "s3:GetBucketCORS",
         "s3:GetBucketLocation",
+        "s3:GetBucketLogging",
+        "s3:GetBucketObjectLockConfiguration",
         "s3:GetBucketOwnershipControls",
         "s3:GetBucketPolicy",
         "s3:GetBucketPolicyStatus",
         "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketRequestPayment",
         "s3:GetBucketTagging",
         "s3:GetBucketVersioning",
+        "s3:GetBucketWebsite",
         "s3:GetEncryptionConfiguration",
         "s3:GetLifecycleConfiguration",
+        "s3:GetReplicationConfiguration",
         "s3:ListBucket",
         "s3:PutBucketOwnershipControls",
         "s3:PutBucketPolicy",
@@ -85,6 +91,16 @@
         "dynamodb:TagResource",
         "dynamodb:UntagResource",
         "dynamodb:UpdateTable"
+      ],
+      "Resource": "arn:aws:dynamodb:<AWS_REGION>:<AWS_ACCOUNT_ID>:table/inform-crawler-runtime-lock-dev"
+    },
+    {
+      "Sid": "ExerciseDevRuntimeLock",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DeleteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem"
       ],
       "Resource": "arn:aws:dynamodb:<AWS_REGION>:<AWS_ACCOUNT_ID>:table/inform-crawler-runtime-lock-dev"
     },
@@ -205,6 +221,19 @@
       }
     },
     {
+      "Sid": "TagDevCrawlerLaunchTemplateOnCreate",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:launch-template/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Application": "inform-crawler",
+          "aws:RequestTag/Environment": "dev",
+          "ec2:CreateAction": "CreateLaunchTemplate"
+        }
+      }
+    },
+    {
       "Sid": "CreateTaggedDevCrawlerSecurityGroup",
       "Effect": "Allow",
       "Action": "ec2:CreateSecurityGroup",
@@ -261,6 +290,37 @@
       }
     },
     {
+      "Sid": "AuthorizeTaggedDevCrawlerSecurityGroupRule",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:AuthorizeSecurityGroupIngress"
+      ],
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group-rule/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Application": "inform-crawler",
+          "aws:RequestTag/Environment": "dev"
+        }
+      }
+    },
+    {
+      "Sid": "TagDevCrawlerSecurityGroupRuleOnCreate",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:security-group-rule/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Application": "inform-crawler",
+          "aws:RequestTag/Environment": "dev",
+          "ec2:CreateAction": [
+            "AuthorizeSecurityGroupEgress",
+            "AuthorizeSecurityGroupIngress"
+          ]
+        }
+      }
+    },
+    {
       "Sid": "ManageOnlyCrawlerIngressOnMainDbSecurityGroup",
       "Effect": "Allow",
       "Action": [
@@ -281,6 +341,7 @@
         "ssm:CreateDocument",
         "ssm:DeleteDocument",
         "ssm:DescribeDocument",
+        "ssm:DescribeDocumentPermission",
         "ssm:GetDocument",
         "ssm:ListDocumentVersions",
         "ssm:ListTagsForResource",
@@ -289,6 +350,12 @@
         "ssm:UpdateDocumentDefaultVersion"
       ],
       "Resource": "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:document/inform-crawler-worker-dev"
+    },
+    {
+      "Sid": "ReadDevDbDenialGuard",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/inform/crawler/dev/PRODUCTION_DB_ACCESS_ALLOWED"
     },
     {
       "Sid": "ValidateStateMachineDefinition",
@@ -310,6 +377,24 @@
         "states:UpdateStateMachine"
       ],
       "Resource": "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:inform-crawler-orchestration-dev"
+    },
+    {
+      "Sid": "ExerciseDevCrawlerStateMachine",
+      "Effect": "Allow",
+      "Action": [
+        "states:ListExecutions",
+        "states:StartExecution"
+      ],
+      "Resource": "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:stateMachine:inform-crawler-orchestration-dev"
+    },
+    {
+      "Sid": "ObserveAndStopDevCrawlerExecutions",
+      "Effect": "Allow",
+      "Action": [
+        "states:DescribeExecution",
+        "states:StopExecution"
+      ],
+      "Resource": "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:execution:inform-crawler-orchestration-dev:*"
     },
     {
       "Sid": "ManageDevCrawlerSchedule",
