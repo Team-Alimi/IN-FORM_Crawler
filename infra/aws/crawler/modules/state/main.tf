@@ -95,6 +95,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
   }
 
   rule {
+    id     = "abort-failure-multipart-uploads-7-days"
+    status = "Enabled"
+    filter { prefix = "${local.key_prefix}failures/" }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+  }
+
+  rule {
     id     = "failure-queue-30-days"
     status = "Enabled"
     filter {
@@ -105,7 +112,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
     }
     expiration { days = 30 }
     noncurrent_version_expiration { noncurrent_days = 30 }
-    abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
 }
 

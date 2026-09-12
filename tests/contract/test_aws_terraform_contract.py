@@ -313,6 +313,31 @@ class AwsDurableStateTerraformContractTests(unittest.TestCase):
 
         self.assertNotRegex(self.state, r'prefix\s*=\s*"history/current')
 
+    def test_tag_filtered_lifecycle_rule_does_not_abort_multipart_uploads(
+        self,
+    ) -> None:
+        def lifecycle_rule(rule_id: str) -> str:
+            id_position = self.state.index(f'id     = "{rule_id}"')
+            block_start = self.state.rfind("  rule {", 0, id_position)
+            depth = 0
+            for match in re.finditer(r"[{}]", self.state[block_start:]):
+                depth += 1 if match.group() == "{" else -1
+                if depth == 0:
+                    return self.state[block_start : block_start + match.end()]
+            self.fail(f"Unclosed lifecycle rule: {rule_id}")
+
+        queue_rule = lifecycle_rule("failure-queue-30-days")
+        self.assertIn('tags   = { ArtifactClass = "queue" }', queue_rule)
+        self.assertNotIn("abort_incomplete_multipart_upload", queue_rule)
+
+        abort_rule = lifecycle_rule("abort-failure-multipart-uploads-7-days")
+        self.assertIn('prefix = "${local.key_prefix}failures/"', abort_rule)
+        self.assertIn(
+            "abort_incomplete_multipart_upload { days_after_initiation = 7 }",
+            abort_rule,
+        )
+        self.assertNotIn("tags", abort_rule)
+
     def test_lock_table_uses_atomic_lease_data_not_ttl_takeover(self) -> None:
         self.assertIn('resource "aws_dynamodb_table" "runtime_lock"', self.state)
         self.assertIn('hash_key     = "lock_key"', self.state)
