@@ -418,7 +418,6 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
                     read(f"modules/{module}/main.tf"),
                 )
 
-
 class AwsDurableStateTerraformContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -890,7 +889,6 @@ class AwsDevHarnessContractTests(unittest.TestCase):
         harness = read("harness/run-dev.ps1")
         self.assertIn(r"""'"Seconds"\s*:\s*600'""", harness)
         self.assertIn(r"""'"Seconds"\s*:\s*1800'""", harness)
-
 
 if __name__ == "__main__":
     unittest.main()
