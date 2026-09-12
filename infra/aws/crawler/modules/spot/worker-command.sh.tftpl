@@ -97,8 +97,31 @@ owns_live_lease() {
     <<<"$response" >/dev/null
 }
 
+stop_background_process() {
+  local pid="$${1:-}"
+  [ -n "$pid" ] || return 0
+  kill "$pid" >/dev/null 2>&1 || true
+  wait "$pid" >/dev/null 2>&1 || true
+}
+
+managed_sleep() {
+  local seconds="$1"
+  local status=0
+  sleep "$seconds" &
+  SLEEP_PID=$!
+  wait "$SLEEP_PID" || status=$?
+  SLEEP_PID=''
+  return "$status"
+}
+
+install_managed_sleep_trap() {
+  trap 'stop_background_process "$${SLEEP_PID:-}"; exit 0' TERM INT
+}
+
 heartbeat_loop() {
-  while sleep "$HEARTBEAT_SECONDS"; do
+  local SLEEP_PID=''
+  install_managed_sleep_trap
+  while managed_sleep "$HEARTBEAT_SECONDS"; do
     local now expires values
     now="$(date -u +%s)"
     expires="$((now + LEASE_SECONDS))"
@@ -129,12 +152,14 @@ release_lease() {
 }
 
 interruption_loop() {
-  local token code
-  token="$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' \
+  local token code SLEEP_PID=''
+  install_managed_sleep_trap
+  token="$(curl -fsS --connect-timeout 2 --max-time 5 -X PUT \
+    -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' \
     http://169.254.169.254/latest/api/token || true)"
-  while sleep 5; do
+  while managed_sleep 5; do
     [ -n "$token" ] || continue
-    code="$(curl -sS -o /dev/null -w '%%{http_code}' \
+    code="$(curl -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%%{http_code}' \
       -H "X-aws-ec2-metadata-token: $token" \
       http://169.254.169.254/latest/meta-data/spot/instance-action || true)"
     if [ "$code" = 200 ]; then
@@ -146,10 +171,10 @@ interruption_loop() {
 }
 
 cleanup() {
-  [ -n "$HEARTBEAT_PID" ] && kill "$HEARTBEAT_PID" >/dev/null 2>&1 || true
-  [ -n "$INTERRUPTION_PID" ] && kill "$INTERRUPTION_PID" >/dev/null 2>&1 || true
-  [ -n "$TIMEOUT_PID" ] && kill "$TIMEOUT_PID" >/dev/null 2>&1 || true
-  [ -n "$WARNING_PID" ] && kill "$WARNING_PID" >/dev/null 2>&1 || true
+  stop_background_process "$HEARTBEAT_PID"
+  stop_background_process "$INTERRUPTION_PID"
+  stop_background_process "$TIMEOUT_PID"
+  stop_background_process "$WARNING_PID"
   release_lease
   rm -f "$RUNTIME_ENV"
   rm -rf "$DOCKER_CONFIG"
@@ -157,9 +182,25 @@ cleanup() {
 trap cleanup EXIT
 trap 'touch "$INTERRUPTED_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true' TERM INT
 
-(sleep "$WARNING_SECONDS"; printf '%s\n' 'crawler runtime reached the 90-minute warning threshold' >> "$LOG_DIR/worker.log") &
+warning_action() {
+  printf '%s\n' 'crawler runtime reached the 90-minute warning threshold' >> "$LOG_DIR/worker.log"
+}
+
+timeout_action() {
+  touch "$TIMEOUT_FLAG"
+  docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true
+}
+
+managed_timer() {
+  local seconds="$1" action="$2" SLEEP_PID=''
+  install_managed_sleep_trap
+  managed_sleep "$seconds" || return 0
+  "$action"
+}
+
+managed_timer "$WARNING_SECONDS" warning_action &
 WARNING_PID=$!
-(sleep "$HARD_TIMEOUT_SECONDS"; touch "$TIMEOUT_FLAG"; docker stop --time 30 "$CONTAINER_NAME" >/dev/null 2>&1 || true) &
+managed_timer "$HARD_TIMEOUT_SECONDS" timeout_action &
 TIMEOUT_PID=$!
 
 restore_history() {

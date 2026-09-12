@@ -373,14 +373,53 @@ class AwsDurableStateTerraformContractTests(unittest.TestCase):
         self.assertLess(run_success, current_success)
         self.assertLess(current_success, current_pointer)
 
+    def test_worker_cleanup_reaps_background_sleep_children(self) -> None:
+        worker = read("modules/spot/worker-command.sh.tftpl")
+        for fragment in (
+            "managed_sleep() {",
+            "trap 'stop_background_process \"$${SLEEP_PID:-}\"; exit 0' TERM INT",
+            'while managed_sleep "$HEARTBEAT_SECONDS"; do',
+            "while managed_sleep 5; do",
+            'stop_background_process "$HEARTBEAT_PID"',
+            'stop_background_process "$INTERRUPTION_PID"',
+            'stop_background_process "$WARNING_PID"',
+            'stop_background_process "$TIMEOUT_PID"',
+            'managed_timer "$WARNING_SECONDS" warning_action &',
+            'managed_timer "$HARD_TIMEOUT_SECONDS" timeout_action &',
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, worker)
+
+        self.assertNotIn('(sleep "$WARNING_SECONDS";', worker)
+        self.assertNotIn('(sleep "$HARD_TIMEOUT_SECONDS";', worker)
+        self.assertNotIn('while sleep "$HEARTBEAT_SECONDS"; do', worker)
+        self.assertNotIn("while sleep 5; do", worker)
+
+    def test_worker_metadata_requests_have_bounded_runtime(self) -> None:
+        worker = read("modules/spot/worker-command.sh.tftpl")
+        self.assertEqual(2, worker.count("--connect-timeout 2"))
+        self.assertEqual(2, worker.count("--max-time 5"))
+
 
 class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.scheduler = read("modules/scheduler/main.tf")
-        cls.scheduler_definition = json.loads(
-            read("modules/scheduler/state-machine.asl.json")
+        cls.scheduler_outputs = read("modules/scheduler/outputs.tf")
+        cls.scheduler_definition_template = read(
+            "modules/scheduler/state-machine.asl.json"
         )
+        rendered_definition = (
+            cls.scheduler_definition_template.replace(
+                "${launch_template_id}", "lt-approved"
+            )
+            .replace("${launch_template_version}", "7")
+            .replace(
+                "${fleet_overrides_json}",
+                '[{"InstanceType":"m7i-flex.large","SubnetId":"subnet-approved"}]',
+            )
+        )
+        cls.scheduler_definition = json.loads(rendered_definition)
         cls.spot = read("modules/spot/main.tf")
         cls.network = read("modules/network/main.tf")
         cls.iam = read("modules/iam/main.tf")
