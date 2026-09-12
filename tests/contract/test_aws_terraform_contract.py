@@ -628,7 +628,7 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
 
         run_template = re.search(
             r'sid\s*=\s*"RunOnlyApprovedWorkerTemplate"[\s\S]*?'
-            r'^\s{2}}(?=\n\n\s{2}statement\s*{)',
+            r"^\s{2}}(?=\n\n\s{2}statement\s*{)",
             self.scheduler,
             re.MULTILINE,
         )
@@ -639,16 +639,14 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             r'actions\s*=\s*\["ec2:RunInstances"\]',
         )
         self.assertIn('variable = "ec2:LaunchTemplate"', run_template_block)
-        self.assertIn(
-            'variable = "ec2:IsLaunchTemplateResource"', run_template_block
-        )
+        self.assertIn('variable = "ec2:IsLaunchTemplateResource"', run_template_block)
         self.assertIn('test     = "Bool"', run_template_block)
         self.assertIn('values   = ["true"]', run_template_block)
         self.assertIn(':launch-template/*"', run_template_block)
         self.assertRegex(
             self.scheduler,
             r'sid\s*=\s*"UseOnlyApprovedWorkerLaunchTemplate"[\s\S]*?'
-            r'resources\s*=\s*\[var\.launch_template_arn\]',
+            r"resources\s*=\s*\[var\.launch_template_arn\]",
         )
         self.assertRegex(
             self.scheduler,
@@ -689,9 +687,7 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             '"Overrides.$"',
         ):
             with self.subTest(dynamic_field=dynamic_field):
-                self.assertNotIn(
-                    dynamic_field, self.scheduler_definition_template
-                )
+                self.assertNotIn(dynamic_field, self.scheduler_definition_template)
 
         launch_config = self.scheduler_definition["States"]["LaunchSpotWorker"][
             "Parameters"
@@ -711,13 +707,13 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
         )
 
         schedule_target = re.search(
-            r'target\s*\{[\s\S]*?input\s*=\s*jsonencode\(\{([\s\S]*?)\}\)',
+            r"target\s*\{[\s\S]*?input\s*=\s*jsonencode\(\{([\s\S]*?)\}\)",
             self.scheduler,
         )
         self.assertIsNotNone(schedule_target)
         manual_input = re.search(
             r'output\s+"manual_execution_input"\s*\{[\s\S]*?jsonencode\(\{'
-            r'([\s\S]*?)\}\)',
+            r"([\s\S]*?)\}\)",
             self.scheduler_outputs,
         )
         self.assertIsNotNone(manual_input)
