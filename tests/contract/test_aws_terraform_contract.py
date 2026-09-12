@@ -34,6 +34,7 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             ".github",
             ".agents",
             ".specify",
+            ".codex-*",
             ".playwright-mcp",
             "specs",
             "infra",
