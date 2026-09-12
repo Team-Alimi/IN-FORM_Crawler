@@ -6,9 +6,6 @@
       "Type": "Pass",
       "Parameters": {
         "Attempt.$": "$.Attempt",
-        "LaunchTemplateId.$": "$.LaunchTemplateId",
-        "LaunchTemplateVersion.$": "$.LaunchTemplateVersion",
-        "Overrides.$": "$.Overrides",
         "WorkerDocumentName.$": "$.WorkerDocumentName",
         "Simulation.$": "$.Simulation",
         "RunUuid.$": "States.UUID()",
@@ -24,10 +21,10 @@
         "Type": "instant",
         "LaunchTemplateConfigs": [{
           "LaunchTemplateSpecification": {
-            "LaunchTemplateId.$": "$.LaunchTemplateId",
-            "Version.$": "$.LaunchTemplateVersion"
+            "LaunchTemplateId": "${launch_template_id}",
+            "Version": "${launch_template_version}"
           },
-          "Overrides.$": "$.Overrides"
+          "Overrides": ${fleet_overrides_json}
         }],
         "TargetCapacitySpecification": {
           "TotalTargetCapacity": 1,
@@ -36,7 +33,6 @@
         },
         "SpotOptions": {
           "AllocationStrategy": "price-capacity-optimized",
-          "MinTargetCapacity": 1,
           "SingleInstanceType": false,
           "SingleAvailabilityZone": false
         }
@@ -45,7 +41,7 @@
       "Catch": [{
         "ErrorEquals": ["States.ALL"],
         "ResultPath": "$.LaunchError",
-        "Next": "SetSpotCapacityFailure"
+        "Next": "ClassifyLaunchFailure"
       }],
       "Next": "FleetHasInstance"
     },
@@ -145,9 +141,6 @@
       "Type": "Pass",
       "Parameters": {
         "Attempt.$": "$.Attempt",
-        "LaunchTemplateId.$": "$.LaunchTemplateId",
-        "LaunchTemplateVersion.$": "$.LaunchTemplateVersion",
-        "Overrides.$": "$.Overrides",
         "WorkerDocumentName.$": "$.WorkerDocumentName",
         "Simulation.$": "$.Simulation",
         "RunUuid.$": "$.RunUuid",
@@ -196,6 +189,21 @@
         { "Variable": "$.WorkerResult.Value.error_class", "StringEquals": "S3_TRANSIENT", "Next": "TerminateRetryable" }
       ],
       "Default": "TerminateNonRetryable"
+    },
+    "ClassifyLaunchFailure": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.LaunchError.Cause", "StringMatches": "*not authorized*", "Next": "SetAuthorizationFailure" },
+        { "Variable": "$.LaunchError.Cause", "StringMatches": "*AccessDenied*", "Next": "SetAuthorizationFailure" },
+        { "Variable": "$.LaunchError.Cause", "StringMatches": "*Unauthorized*", "Next": "SetAuthorizationFailure" }
+      ],
+      "Default": "SetSpotCapacityFailure"
+    },
+    "SetAuthorizationFailure": {
+      "Type": "Pass",
+      "Result": { "Value": { "status": "FAILED", "error_class": "AUTHORIZATION_ERROR" } },
+      "ResultPath": "$.WorkerResult",
+      "Next": "Failed"
     },
     "SetSpotCapacityFailure": {
       "Type": "Pass",

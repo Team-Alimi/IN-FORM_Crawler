@@ -20,9 +20,83 @@ locals {
 
 data "aws_iam_policy_document" "orchestration" {
   statement {
-    sid       = "LaunchOnlyApprovedWorkerTemplate"
-    actions   = ["ec2:CreateFleet", "ec2:RunInstances"]
-    resources = ["*"]
+    sid     = "CreateApprovedWorkerFleet"
+    actions = ["ec2:CreateFleet"]
+    resources = concat(
+      [
+        "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:fleet/*",
+        "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:instance/*",
+        "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:volume/*",
+        "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}::image/*",
+        var.launch_template_arn,
+      ],
+      local.subnet_arns,
+    )
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [data.aws_region.current.region]
+    }
+  }
+
+  statement {
+    sid     = "RunOnlyApprovedWorkerTemplate"
+    actions = ["ec2:RunInstances"]
+    not_resources = [
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:instance/*",
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:launch-template/*",
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:network-interface/*",
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:subnet/*",
+    ]
+    condition {
+      test     = "ArnEquals"
+      variable = "ec2:LaunchTemplate"
+      values   = [var.launch_template_arn]
+    }
+    condition {
+      test     = "Bool"
+      variable = "ec2:IsLaunchTemplateResource"
+      values   = ["true"]
+    }
+  }
+
+  statement {
+    sid       = "UseOnlyApprovedWorkerLaunchTemplate"
+    actions   = ["ec2:RunInstances"]
+    resources = [var.launch_template_arn]
+  }
+
+  statement {
+    sid       = "RunOnlyApprovedWorkerInstanceTypes"
+    actions   = ["ec2:RunInstances"]
+    resources = ["arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:instance/*"]
+    condition {
+      test     = "ArnEquals"
+      variable = "ec2:LaunchTemplate"
+      values   = [var.launch_template_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "ec2:InstanceType"
+      values   = var.candidate_instance_types
+    }
+  }
+
+  statement {
+    sid       = "RunOnlyApprovedWorkerSubnets"
+    actions   = ["ec2:RunInstances"]
+    resources = local.subnet_arns
+    condition {
+      test     = "ArnEquals"
+      variable = "ec2:LaunchTemplate"
+      values   = [var.launch_template_arn]
+    }
+  }
+
+  statement {
+    sid       = "RunOnlyApprovedWorkerNetworkInterfaces"
+    actions   = ["ec2:RunInstances"]
+    resources = ["arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:network-interface/*"]
     condition {
       test     = "ArnEquals"
       variable = "ec2:LaunchTemplate"
@@ -32,11 +106,6 @@ data "aws_iam_policy_document" "orchestration" {
       test     = "ArnEquals"
       variable = "ec2:Subnet"
       values   = local.subnet_arns
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "ec2:InstanceType"
-      values   = var.candidate_instance_types
     }
   }
 
@@ -81,11 +150,15 @@ resource "aws_iam_role_policy" "orchestration" {
 }
 
 resource "aws_sfn_state_machine" "crawler" {
-  name       = "inform-crawler-orchestration-${var.environment}"
-  role_arn   = var.orchestration_role_arn
-  type       = "STANDARD"
-  definition = file("${path.module}/state-machine.asl.json")
-  tags       = local.tags
+  name     = "inform-crawler-orchestration-${var.environment}"
+  role_arn = var.orchestration_role_arn
+  type     = "STANDARD"
+  definition = templatefile("${path.module}/state-machine.asl.json", {
+    launch_template_id      = var.launch_template_id
+    launch_template_version = tostring(var.launch_template_version)
+    fleet_overrides_json    = jsonencode(local.fleet_overrides)
+  })
+  tags = local.tags
 }
 
 data "aws_iam_policy_document" "scheduler_start" {
@@ -115,12 +188,9 @@ resource "aws_scheduler_schedule" "daily" {
     arn      = aws_sfn_state_machine.crawler.arn
     role_arn = var.scheduler_role_arn
     input = jsonencode({
-      Attempt               = 1
-      LaunchTemplateId      = var.launch_template_id
-      LaunchTemplateVersion = tostring(var.launch_template_version)
-      Overrides             = local.fleet_overrides
-      WorkerDocumentName    = var.worker_document_name
-      Simulation            = var.simulation
+      Attempt            = 1
+      WorkerDocumentName = var.worker_document_name
+      Simulation         = var.simulation
     })
 
     retry_policy {

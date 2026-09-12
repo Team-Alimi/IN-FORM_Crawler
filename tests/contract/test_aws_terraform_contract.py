@@ -452,6 +452,139 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
             with self.subTest(error_class=retryable):
                 self.assertIn(retryable, definition)
 
+    def test_instant_fleet_keeps_multi_pool_fallback_valid(self) -> None:
+        launch = self.scheduler_definition["States"]["LaunchSpotWorker"]
+        spot_options = launch["Parameters"]["SpotOptions"]
+
+        self.assertEqual("price-capacity-optimized", spot_options["AllocationStrategy"])
+        self.assertFalse(spot_options["SingleInstanceType"])
+        self.assertFalse(spot_options["SingleAvailabilityZone"])
+        self.assertNotIn("MinTargetCapacity", spot_options)
+
+    def test_create_fleet_permission_is_separate_from_launch_constraints(
+        self,
+    ) -> None:
+        create_fleet = re.search(
+            r'sid\s*=\s*"CreateApprovedWorkerFleet"[\s\S]*?^\s*}',
+            self.scheduler,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(create_fleet)
+        create_fleet_block = create_fleet.group(0)
+        self.assertRegex(
+            create_fleet_block,
+            r'actions\s*=\s*\["ec2:CreateFleet"\]',
+        )
+        self.assertIn(':fleet/*"', create_fleet_block)
+        self.assertIn("var.launch_template_arn", create_fleet_block)
+        self.assertIn("local.subnet_arns", create_fleet_block)
+        self.assertIn(':instance/*"', create_fleet_block)
+        self.assertIn(':volume/*"', create_fleet_block)
+        self.assertIn('::image/*"', create_fleet_block)
+        self.assertNotIn("ec2:LaunchTemplate", create_fleet_block)
+        self.assertNotIn("ec2:Subnet", create_fleet_block)
+        self.assertNotIn("ec2:InstanceType", create_fleet_block)
+
+        run_template = re.search(
+            r'sid\s*=\s*"RunOnlyApprovedWorkerTemplate"[\s\S]*?'
+            r'^\s{2}}(?=\n\n\s{2}statement\s*{)',
+            self.scheduler,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(run_template)
+        run_template_block = run_template.group(0)
+        self.assertRegex(
+            run_template_block,
+            r'actions\s*=\s*\["ec2:RunInstances"\]',
+        )
+        self.assertIn('variable = "ec2:LaunchTemplate"', run_template_block)
+        self.assertIn(
+            'variable = "ec2:IsLaunchTemplateResource"', run_template_block
+        )
+        self.assertIn('test     = "Bool"', run_template_block)
+        self.assertIn('values   = ["true"]', run_template_block)
+        self.assertIn(':launch-template/*"', run_template_block)
+        self.assertRegex(
+            self.scheduler,
+            r'sid\s*=\s*"UseOnlyApprovedWorkerLaunchTemplate"[\s\S]*?'
+            r'resources\s*=\s*\[var\.launch_template_arn\]',
+        )
+        self.assertRegex(
+            self.scheduler,
+            r'sid\s*=\s*"RunOnlyApprovedWorkerInstanceTypes"[\s\S]*?'
+            r'variable\s*=\s*"ec2:InstanceType"',
+        )
+        self.assertRegex(
+            self.scheduler,
+            r'sid\s*=\s*"RunOnlyApprovedWorkerSubnets"[\s\S]*?'
+            r"resources\s*=\s*local\.subnet_arns[\s\S]*?"
+            r'variable\s*=\s*"ec2:LaunchTemplate"',
+        )
+        self.assertRegex(
+            self.scheduler,
+            r'sid\s*=\s*"RunOnlyApprovedWorkerNetworkInterfaces"[\s\S]*?'
+            r'variable\s*=\s*"ec2:Subnet"',
+        )
+
+    def test_launch_configuration_is_rendered_from_terraform_not_execution_input(
+        self,
+    ) -> None:
+        self.assertIn(
+            'definition = templatefile("${path.module}/state-machine.asl.json"',
+            self.scheduler,
+        )
+        for assignment in (
+            "launch_template_id      = var.launch_template_id",
+            "launch_template_version = tostring(var.launch_template_version)",
+            "fleet_overrides_json    = jsonencode(local.fleet_overrides)",
+        ):
+            with self.subTest(assignment=assignment):
+                self.assertIn(assignment, self.scheduler)
+
+        for dynamic_field in (
+            '"LaunchTemplateId.$"',
+            '"LaunchTemplateVersion.$"',
+            '"Version.$"',
+            '"Overrides.$"',
+        ):
+            with self.subTest(dynamic_field=dynamic_field):
+                self.assertNotIn(
+                    dynamic_field, self.scheduler_definition_template
+                )
+
+        launch_config = self.scheduler_definition["States"]["LaunchSpotWorker"][
+            "Parameters"
+        ]["LaunchTemplateConfigs"][0]
+        self.assertEqual(
+            {"LaunchTemplateId": "lt-approved", "Version": "7"},
+            launch_config["LaunchTemplateSpecification"],
+        )
+        self.assertEqual(
+            [
+                {
+                    "InstanceType": "m7i-flex.large",
+                    "SubnetId": "subnet-approved",
+                }
+            ],
+            launch_config["Overrides"],
+        )
+
+        schedule_target = re.search(
+            r'target\s*\{[\s\S]*?input\s*=\s*jsonencode\(\{([\s\S]*?)\}\)',
+            self.scheduler,
+        )
+        self.assertIsNotNone(schedule_target)
+        manual_input = re.search(
+            r'output\s+"manual_execution_input"\s*\{[\s\S]*?jsonencode\(\{'
+            r'([\s\S]*?)\}\)',
+            self.scheduler_outputs,
+        )
+        self.assertIsNotNone(manual_input)
+        for input_block in (schedule_target.group(1), manual_input.group(1)):
+            self.assertNotIn("LaunchTemplateId", input_block)
+            self.assertNotIn("LaunchTemplateVersion", input_block)
+            self.assertNotIn("Overrides", input_block)
+
     def test_state_machine_references_only_declared_states(self) -> None:
         states = self.scheduler_definition["States"]
         targets: set[str] = set()
@@ -465,6 +598,25 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
                 targets.add(catcher["Next"])
         self.assertEqual(set(), targets - set(states))
         self.assertIn(self.scheduler_definition["StartAt"], states)
+
+    def test_launch_authorization_failure_is_non_retryable(self) -> None:
+        states = self.scheduler_definition["States"]
+        launch_catch = states["LaunchSpotWorker"]["Catch"][0]
+        self.assertEqual("ClassifyLaunchFailure", launch_catch["Next"])
+
+        authorization_targets = {
+            choice["Next"]
+            for choice in states["ClassifyLaunchFailure"]["Choices"]
+            if "authorized" in choice.get("StringMatches", "").lower()
+            or "accessdenied" in choice.get("StringMatches", "").lower()
+            or "unauthorized" in choice.get("StringMatches", "").lower()
+        }
+        self.assertEqual({"SetAuthorizationFailure"}, authorization_targets)
+        self.assertEqual(
+            "AUTHORIZATION_ERROR",
+            states["SetAuthorizationFailure"]["Result"]["Value"]["error_class"],
+        )
+        self.assertEqual("Failed", states["SetAuthorizationFailure"]["Next"])
 
     def test_spot_worker_is_disposable_and_multi_pool(self) -> None:
         for fragment in (
