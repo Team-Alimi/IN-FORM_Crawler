@@ -30,6 +30,20 @@ class UpstageRuntimeKeyContractTests(unittest.TestCase):
             api_key="test-only-key", base_url="https://api.upstage.ai/v1"
         )
 
+    def test_ai_uses_the_approved_solar_pro4_model(self):
+        with mock.patch.dict(
+            os.environ,
+            {"UPSTAGE_API_KEY": "test-only-key"},
+            clear=False,
+        ):
+            importlib.reload(config)
+            importlib.reload(base)
+
+            with mock.patch.object(base, "OpenAI"):
+                analyzer = base.AI()
+
+        self.assertEqual(analyzer.model, "solar-pro4")
+
 
 if __name__ == "__main__":
     unittest.main()

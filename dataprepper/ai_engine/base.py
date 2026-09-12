@@ -14,7 +14,7 @@ from .date_extractor import DateExtractionRules
 
 
 class AI:
-    """Upstage Solar Pro 3 기반 AI 통합 분석기"""
+    """Upstage Solar Pro 4 기반 AI 통합 분석기"""
 
     def __init__(self):
         """API 클라이언트 초기화 및 모델 설정"""
@@ -26,14 +26,14 @@ class AI:
         self.client = OpenAI(
             api_key=UPSTAGE_API_KEY, base_url="https://api.upstage.ai/v1"
         )
-        self.model = "solar-pro3"
+        self.model = "solar-pro4"
 
     def process(self, articles):
         """병렬 처리를 통한 배치 분석 실행"""
         if not self.client or not articles:
             return articles
         log_status(
-            "AI", f"분석 시작 ({len(articles)}건) - Solar Pro 3 (Parallel)", "START"
+            "AI", f"분석 시작 ({len(articles)}건) - Solar Pro 4 (Parallel)", "START"
         )
 
         with ThreadPoolExecutor(max_workers=3) as executor:
