@@ -55,6 +55,14 @@ emit_result() {
     '{status:$status,error_class:$error_class,run_id:$run_id}'
 }
 
+wait_for_instance_bootstrap() {
+  command -v cloud-init >/dev/null 2>&1 || return 1
+  cloud-init status --wait >/dev/null 2>&1 || return 1
+  command -v docker >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet docker || return 1
+  docker info >/dev/null 2>&1 || return 1
+}
+
 lease_values() {
   local now="$1"
   local expires="$2"
@@ -243,6 +251,7 @@ load_runtime_parameters() {
     --name "$PARAMETER_NAMESPACE/runtime-env" --query Parameter.Value --output text)" || return 1
   printf '%s\n' "$env_value" > "$RUNTIME_ENV"
   printf 'POSTGRES_SECRET_ID=%s\n' "$DATABASE_SECRET_ARN" >> "$RUNTIME_ENV"
+  printf 'AWS_REGION=%s\nAWS_DEFAULT_REGION=%s\n' "$AWS_REGION" "$AWS_REGION" >> "$RUNTIME_ENV"
   printf 'CRAWLER_HISTORY_DIR=/runtime/history\nCRAWLER_QUEUE_DIR=/runtime/queue\nCRAWLER_LOG_DIR=/runtime/logs\n' >> "$RUNTIME_ENV"
 }
 
@@ -372,6 +381,13 @@ persist_failure() {
   done
 }
 
+if ! wait_for_instance_bootstrap; then
+  printf '%s\n' 'WORKER_BOOTSTRAP_FAILURE=INSTANCE_READINESS' >&2
+  persist_failure FAILED BOOTSTRAP_TRANSIENT || true
+  printf '{"status":"FAILED","error_class":"BOOTSTRAP_TRANSIENT","run_id":"%s"}\n' "$RUN_ID"
+  exit 0
+fi
+
 acquire_lease
 heartbeat_loop & HEARTBEAT_PID=$!
 interruption_loop & INTERRUPTION_PID=$!
@@ -381,6 +397,7 @@ if ! restore_history; then
   exit 0
 fi
 if ! load_runtime_parameters; then
+  printf '%s\n' 'WORKER_BOOTSTRAP_FAILURE=RUNTIME_PARAMETER' >&2
   persist_failure FAILED BOOTSTRAP_TRANSIENT
   emit_result FAILED BOOTSTRAP_TRANSIENT
   exit 0
@@ -401,6 +418,7 @@ case "$SIMULATION" in
 esac
 
 if ! prepare_image; then
+  printf '%s\n' 'WORKER_BOOTSTRAP_FAILURE=IMAGE_PREPARATION' >&2
   persist_failure FAILED BOOTSTRAP_TRANSIENT
   emit_result FAILED BOOTSTRAP_TRANSIENT
   exit 0

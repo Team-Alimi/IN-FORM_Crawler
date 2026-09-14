@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-dnf install -y docker awscli2 curl jq
+dnf install -y docker jq
+command -v aws >/dev/null 2>&1
+command -v curl >/dev/null 2>&1
 systemctl enable --now docker
 systemctl enable --now amazon-ssm-agent
 

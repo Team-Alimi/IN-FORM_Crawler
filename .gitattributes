@@ -1,3 +1,4 @@
 # Linux container bootstrap scripts must retain LF on Windows worktrees.
 docker/postgres/Dockerfile text eol=lf
 docker/postgres/initdb/*.sh text eol=lf
+infra/aws/crawler/modules/spot/*.sh.tftpl text eol=lf

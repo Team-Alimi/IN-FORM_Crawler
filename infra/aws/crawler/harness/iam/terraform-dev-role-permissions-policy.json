@@ -79,6 +79,12 @@
       "Resource": "arn:aws:s3:::<CRAWLER_STATE_BUCKET>"
     },
     {
+      "Sid": "ReadDevCrawlerFailureArtifacts",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::<CRAWLER_STATE_BUCKET>/*failures/*"
+    },
+    {
       "Sid": "ManageDevRuntimeLockTable",
       "Effect": "Allow",
       "Action": [
@@ -192,6 +198,7 @@
         "ec2:DescribeAccountAttributes",
         "ec2:DescribeAvailabilityZones",
         "ec2:DescribeImages",
+        "ec2:DescribeInstances",
         "ec2:DescribeInstanceTypes",
         "ec2:DescribeLaunchTemplateVersions",
         "ec2:DescribeLaunchTemplates",
@@ -392,6 +399,7 @@
       "Effect": "Allow",
       "Action": [
         "states:DescribeExecution",
+        "states:GetExecutionHistory",
         "states:StopExecution"
       ],
       "Resource": "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:execution:inform-crawler-orchestration-dev:*"

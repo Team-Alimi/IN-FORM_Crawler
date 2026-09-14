@@ -315,6 +315,15 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
                 actions_by_sid["ManageDevCrawlerStateBucket"]
             )
         )
+        self.assertEqual(
+            statements_by_sid["ReadDevCrawlerFailureArtifacts"],
+            {
+                "Sid": "ReadDevCrawlerFailureArtifacts",
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::<CRAWLER_STATE_BUCKET>/*failures/*",
+            },
+        )
         self.assertIn(
             "states:ListStateMachineVersions",
             actions_by_sid["ManageDevCrawlerStateMachine"],
@@ -393,12 +402,24 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
                 ),
             },
         )
+        self.assertIn(
+            "ec2:DescribeInstances",
+            statements_by_sid["ReadDevEc2Dependencies"]["Action"],
+        )
+        self.assertEqual(
+            statements_by_sid["ReadDevEc2Dependencies"]["Condition"],
+            {"StringEquals": {"aws:RequestedRegion": "<AWS_REGION>"}},
+        )
         self.assertEqual(
             statements_by_sid["ObserveAndStopDevCrawlerExecutions"],
             {
                 "Sid": "ObserveAndStopDevCrawlerExecutions",
                 "Effect": "Allow",
-                "Action": ["states:DescribeExecution", "states:StopExecution"],
+                "Action": [
+                    "states:DescribeExecution",
+                    "states:GetExecutionHistory",
+                    "states:StopExecution",
+                ],
                 "Resource": (
                     "arn:aws:states:<AWS_REGION>:<AWS_ACCOUNT_ID>:execution:"
                     "inform-crawler-orchestration-dev:*"
@@ -417,6 +438,7 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
                     "data.aws_region.current.name",
                     read(f"modules/{module}/main.tf"),
                 )
+
 
 class AwsDurableStateTerraformContractTests(unittest.TestCase):
     @classmethod
@@ -539,6 +561,22 @@ class AwsDurableStateTerraformContractTests(unittest.TestCase):
         worker = read("modules/spot/worker-command.sh.tftpl")
         self.assertEqual(2, worker.count("--connect-timeout 2"))
         self.assertEqual(2, worker.count("--max-time 5"))
+
+    def test_linux_worker_templates_use_lf_line_endings(self) -> None:
+        for relative_path in (
+            "modules/spot/user-data.sh.tftpl",
+            "modules/spot/worker-command.sh.tftpl",
+        ):
+            with self.subTest(relative_path=relative_path):
+                content = (IAC_ROOT / relative_path).read_bytes()
+                self.assertTrue(content.startswith(b"#!/bin/bash\n"))
+                self.assertNotIn(b"\r", content)
+
+        attributes = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn(
+            "infra/aws/crawler/modules/spot/*.sh.tftpl text eol=lf",
+            attributes,
+        )
 
 
 class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
@@ -826,6 +864,60 @@ class AwsSchedulerSpotTerraformContractTests(unittest.TestCase):
         self.assertIn('actions   = ["secretsmanager:GetSecretValue"]', self.iam)
         self.assertIn("resources = [var.database_secret_arn]", self.iam)
 
+    def test_worker_passes_aws_region_to_the_crawler_container(self) -> None:
+        worker = read("modules/spot/worker-command.sh.tftpl")
+
+        self.assertIn(
+            "printf 'AWS_REGION=%s\\nAWS_DEFAULT_REGION=%s\\n' "
+            '"$AWS_REGION" "$AWS_REGION" >> "$RUNTIME_ENV"',
+            worker,
+        )
+        self.assertRegex(
+            worker,
+            re.compile(
+                r"load_runtime_parameters\(\) \{[\s\S]*?"
+                r'AWS_DEFAULT_REGION=%s\\n\' "\$AWS_REGION" "\$AWS_REGION" '
+                r'>> "\$RUNTIME_ENV"'
+            ),
+        )
+
+    def test_worker_waits_for_instance_bootstrap_before_using_docker(self) -> None:
+        user_data = read("modules/spot/user-data.sh.tftpl")
+        worker = read("modules/spot/worker-command.sh.tftpl")
+
+        self.assertIn("systemctl enable --now docker", user_data)
+        self.assertIn("command -v cloud-init", worker)
+        self.assertIn("cloud-init status --wait", worker)
+        self.assertIn("systemctl is-active --quiet docker", worker)
+        self.assertIn("docker info >/dev/null 2>&1", worker)
+        for stage in (
+            "INSTANCE_READINESS",
+            "RUNTIME_PARAMETER",
+            "IMAGE_PREPARATION",
+        ):
+            with self.subTest(stage=stage):
+                self.assertIn(f"WORKER_BOOTSTRAP_FAILURE={stage}", worker)
+        self.assertRegex(
+            worker,
+            re.compile(
+                r"if ! wait_for_instance_bootstrap; then[\s\S]*?"
+                r"persist_failure FAILED BOOTSTRAP_TRANSIENT \|\| true[\s\S]*?"
+                r"exit 0\nfi\n\nacquire_lease\nheartbeat_loop"
+            ),
+        )
+
+    def test_al2023_user_data_reuses_preinstalled_aws_cli(self) -> None:
+        user_data = read("modules/spot/user-data.sh.tftpl")
+
+        self.assertNotIn("awscli2", user_data)
+        self.assertIn("command -v aws >/dev/null 2>&1", user_data)
+
+    def test_al2023_user_data_reuses_preinstalled_curl_minimal(self) -> None:
+        user_data = read("modules/spot/user-data.sh.tftpl")
+
+        self.assertNotRegex(user_data, re.compile(r"dnf install[^\n]*\bcurl\b"))
+        self.assertIn("command -v curl >/dev/null 2>&1", user_data)
+
 
 class AwsDevHarnessContractTests(unittest.TestCase):
     def test_harness_requires_explicit_dev_identity_and_never_targets_prod(
@@ -889,6 +981,7 @@ class AwsDevHarnessContractTests(unittest.TestCase):
         harness = read("harness/run-dev.ps1")
         self.assertIn(r"""'"Seconds"\s*:\s*600'""", harness)
         self.assertIn(r"""'"Seconds"\s*:\s*1800'""", harness)
+
 
 if __name__ == "__main__":
     unittest.main()
