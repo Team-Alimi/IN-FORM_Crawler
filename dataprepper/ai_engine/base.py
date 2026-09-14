@@ -10,7 +10,7 @@ from common.logger import log_status
 from config import UPSTAGE_API_KEY, category_code_allows_write, normalize_category_code
 
 from .classifier import ClassificationRules
-from .date_extractor import DateExtractionRules
+from .date_extractor import DateExtractionRules, normalize_extracted_date_range
 
 
 class AI:
@@ -128,9 +128,12 @@ class AI:
             if not category_code_allows_write(category_code):
                 return None
 
+            start_date, due_date = normalize_extracted_date_range(
+                res.get("start_date"), res.get("due_date")
+            )
             article["category_code"] = category_code
-            article["start_date"] = res.get("start_date")
-            article["due_date"] = res.get("due_date")
+            article["start_date"] = start_date
+            article["due_date"] = due_date
 
             log_status("AI", f"성공: {tit[:15]}...", "SUCCESS")
             return article

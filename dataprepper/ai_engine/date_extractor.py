@@ -1,3 +1,22 @@
+from datetime import date
+
+
+def normalize_extracted_date_range(start_date, due_date):
+    """Discard an impossible AI-extracted range without guessing either date."""
+    if start_date is None or due_date is None:
+        return start_date, due_date
+
+    try:
+        parsed_start = date.fromisoformat(start_date)
+        parsed_due = date.fromisoformat(due_date)
+    except (TypeError, ValueError):
+        return start_date, due_date
+
+    if parsed_start > parsed_due:
+        return None, None
+    return start_date, due_date
+
+
 class DateExtractionRules:
     """AI를 사용한 게시글 내 날짜 추출(Extraction)을 위한 규칙과 프롬프트를 정의함"""
 
@@ -10,11 +29,11 @@ class DateExtractionRules:
         Return the result ONLY in valid YYYY-MM-DD (ISO 8601) format, or null.
         
         <Extraction Logic (CRITICAL)>
-        TASK 1에서 분류된 카테고리(Category ID)에 따라 추출해야 하는 날짜의 기준이 다릅니다:
+        TASK 1에서 분류된 category_code에 따라 추출해야 하는 날짜의 기준이 다릅니다:
         
-        - 대상 A: Category 1 (CONTEST), 3 (SCHOLAR), 4 (ACTIVITY)
+        - 대상 A: CONTEST, SCHOLARSHIP, ACTIVITY
           👉 타겟: 신청/접수/제출 기간 (Application Period)
-        - 대상 B: Category 2 (LECTURE)
+        - 대상 B: LECTURE
           👉 타겟: 실제 행사 기간 (Event Period)
         
         <Advanced Reasoning & Distractor Rejection (CRITICAL)>
@@ -25,7 +44,7 @@ class DateExtractionRules:
            - '행사 기간'을 찾을 때(대상 B): "신청 마감일", "사전 접수" 등을 무시하고 실제 본 행사가 열리는 날짜만 찾으세요.
         
         2. 시작일(start_date)이 생략된 엣지 케이스 처리 (매우 중요):
-           - 텍스트에 시작일 없이 마감일/제출기한(예: "~ 3.15(금) 오후 1시까지")만 명시되어 있다면, due_date는 해당 마감일로 설정하고 **start_date는 크롤링 기준일인 Reference Date ({base_date})로 설정**하세요. 억지로 다른 일정(교육일, 발표일 등)을 시작일로 끼워 맞추지 마세요.
+           - 텍스트에 시작일 없이 마감일/제출기한(예: "~ 3.15(금) 오후 1시까지")만 명시되어 있다면, due_date는 해당 마감일로 설정하고 **start_date는 null**로 반환하세요. Reference Date를 가짜 시작일로 사용하거나 다른 일정(교육일, 발표일 등)을 시작일로 끼워 맞추지 마세요.
         
         3. 날짜 추론 및 포맷팅 변환:
            - "2024.3.15", "3/15", "3월 15일" -> 2024-03-15 형태로 변환.
