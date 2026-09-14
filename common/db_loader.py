@@ -42,6 +42,7 @@ def _prepare_attachments(attachments):
         raise ValueError("attachments must be a list")
 
     prepared = []
+    seen_file_urls = set()
     for attachment in attachments:
         if not isinstance(attachment, dict):
             raise ValueError("each attachment must be an object")
@@ -50,7 +51,11 @@ def _prepare_attachments(attachments):
         file_url = attachment.get("file_url")
         if not isinstance(file_url, str) or not file_url.strip():
             raise ValueError("attachment file_url is required")
-        prepared.append({"file_url": file_url.strip()})
+        file_url = file_url.strip()
+        if file_url in seen_file_urls:
+            continue
+        seen_file_urls.add(file_url)
+        prepared.append({"file_url": file_url})
     return prepared
 
 
@@ -65,6 +70,7 @@ def prepare_v11_queue_payload(record):
             raise ValueError("each attachment must be an object")
         file_url = attachment.get("file_url", attachment.get("attachment_url"))
         attachments.append({"file_url": file_url})
+    attachments = _prepare_attachments(attachments)
 
     payload = {
         "source_type": record.get("source_type"),

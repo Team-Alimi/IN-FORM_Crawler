@@ -168,6 +168,35 @@ class V11CrawlerWriterIntegrationTests(unittest.TestCase):
         self.assertEqual(row[8], "https://example.invalid/files/1001.pdf")
         self.assertFalse(queue_path.exists())
 
+    def test_duplicate_attachment_urls_are_collapsed_before_write(self):
+        vendor_id, vendor_initial = self.create_vendor()
+        external_key = "duplicate-attachment-record"
+        record = self.payload(vendor_initial, external_key)
+        file_url = "https://example.invalid/files/duplicate.pdf"
+        second_file_url = "https://example.invalid/files/second.pdf"
+        record["attachments"] = [
+            {"file_url": file_url},
+            {"file_url": second_file_url},
+            {"file_url": f" {file_url} "},
+        ]
+        self.write_queue("INSERT", record)
+
+        self.run_loader()
+
+        row = self.find_article(vendor_id, external_key)
+        self.assertIsNotNone(row)
+        self.created_articles.append(row[0])
+        with self.admin_connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT file_url, sort_order FROM attachments "
+                "WHERE article_id = %s ORDER BY sort_order",
+                (row[0],),
+            )
+            self.assertEqual(
+                cursor.fetchall(),
+                [(file_url, 0), (second_file_url, 1)],
+            )
+
     def test_retry_after_post_commit_queue_cleanup_error_is_idempotent(self):
         vendor_id, vendor_initial = self.create_vendor()
         external_key = "cleanup-retry-record"

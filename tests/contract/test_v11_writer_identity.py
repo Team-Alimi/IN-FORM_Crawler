@@ -65,7 +65,9 @@ class V11WriterIdentityContractTests(unittest.TestCase):
         raw_record["vendor_ids"] = [101]
         raw_record["vendor_urls"] = [raw_record["source_url"]]
         raw_record["attachments"] = [
-            {"attachment_url": "https://example.invalid/files/1001.pdf"}
+            {"attachment_url": "https://example.invalid/files/1001.pdf"},
+            {"file_url": "https://example.invalid/files/1002.pdf"},
+            {"file_url": " https://example.invalid/files/1001.pdf "},
         ]
 
         payload = prepare_v11_queue_payload(raw_record)
@@ -73,7 +75,10 @@ class V11WriterIdentityContractTests(unittest.TestCase):
         self.assertFalse(FORBIDDEN_WRITER_KEYS.intersection(payload))
         self.assertEqual(
             payload["attachments"],
-            [{"file_url": "https://example.invalid/files/1001.pdf"}],
+            [
+                {"file_url": "https://example.invalid/files/1001.pdf"},
+                {"file_url": "https://example.invalid/files/1002.pdf"},
+            ],
         )
 
 
