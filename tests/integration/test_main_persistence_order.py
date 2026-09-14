@@ -34,10 +34,13 @@ class MainPersistenceOrderTests(unittest.TestCase):
         loader=None,
         history_commit=None,
         events=None,
+        unified=None,
     ):
         events = events if events is not None else []
         unifier = mock.Mock()
-        unifier.unify.return_value = ([self.article()], [])
+        unifier.unify.return_value = (
+            unified if unified is not None else ([self.article()], [])
+        )
         unifier.commit.side_effect = history_commit or (
             lambda inserts, updates: events.append("history")
         )
@@ -52,13 +55,21 @@ class MainPersistenceOrderTests(unittest.TestCase):
         db_loader_module.load_json_to_db = mock.Mock(
             side_effect=loader or (lambda: events.append("loader"))
         )
+        save_json = mock.Mock(side_effect=lambda *args: events.append("queue"))
+        log_status = mock.Mock()
         self.last_unifier = unifier
+        self.last_unifier_factory = unifier_module.Unifier
+        self.last_ai = ai
+        self.last_ai_factory = ai_module.AI
+        self.last_loader = db_loader_module.load_json_to_db
         self.last_events = events
+        self.last_save_json = save_json
+        self.last_log_status = log_status
 
         with (
             mock.patch.object(sys, "argv", ["main.py", "--type", "A"]),
             mock.patch.object(crawler_main, "init_logger"),
-            mock.patch.object(crawler_main, "log_status"),
+            mock.patch.object(crawler_main, "log_status", new=log_status),
             mock.patch.object(
                 crawler_main, "load_sites", return_value=[{"type": "A", "name": "site"}]
             ),
@@ -77,7 +88,7 @@ class MainPersistenceOrderTests(unittest.TestCase):
             mock.patch.object(
                 crawler_main,
                 "save_json",
-                side_effect=lambda *args: events.append("queue"),
+                new=save_json,
             ),
         ):
             asyncio.run(crawler_main.main())
@@ -130,6 +141,78 @@ class MainPersistenceOrderTests(unittest.TestCase):
             )
 
         self.assertEqual(["queue", "queue", "loader", "history"], events)
+
+    def test_attachment_only_articles_are_excluded_from_queue_and_history(self):
+        raw_valid = self.article()
+        valid_insert = self.article()
+        valid_update = {**self.article(), "external_key": "source-2"}
+        invalid_whitespace = {
+            **self.article(),
+            "external_key": "source-3",
+            "content": "   ",
+            "attachments": [{"attachment_url": "https://example.invalid/image-1.png"}],
+        }
+        invalid_non_string = {
+            **self.article(),
+            "external_key": "source-4",
+            "content": ["unexpected"],
+            "attachments": [{"attachment_url": "https://example.invalid/image-2.png"}],
+        }
+
+        unifier, _ = self.run_main(
+            mock.AsyncMock(
+                return_value=("site", [raw_valid, invalid_whitespace, invalid_non_string])
+            ),
+            unified=([valid_insert], [valid_update]),
+        )
+
+        unifier.unify.assert_called_once_with([raw_valid])
+        self.assertEqual(
+            [
+                mock.call([valid_insert], "INSERT_DATA.json"),
+                mock.call([valid_update], "UPDATE_DATA.json"),
+            ],
+            self.last_save_json.call_args_list,
+        )
+        self.assertEqual(
+            [mock.call([valid_insert]), mock.call([valid_update])],
+            self.last_ai.process.call_args_list,
+        )
+        unifier.commit.assert_called_once_with([valid_insert], [valid_update])
+        self.last_log_status.assert_any_call(
+            "System",
+            "v11 필수 본문 없음으로 제외: 2건",
+            "WARN",
+        )
+
+    def test_all_attachment_only_articles_skip_ai_loader_and_history(self):
+        invalid_insert = {
+            **self.article(),
+            "content": "",
+            "attachments": [{"attachment_url": "https://example.invalid/image.png"}],
+        }
+
+        unifier, events = self.run_main(
+            mock.AsyncMock(return_value=("site", [invalid_insert])),
+        )
+
+        self.assertEqual(["queue", "queue"], events)
+        self.assertEqual(
+            [
+                mock.call([], "INSERT_DATA.json"),
+                mock.call([], "UPDATE_DATA.json"),
+            ],
+            self.last_save_json.call_args_list,
+        )
+        self.last_unifier_factory.assert_not_called()
+        self.last_ai_factory.assert_not_called()
+        self.last_loader.assert_not_called()
+        unifier.commit.assert_not_called()
+        self.last_log_status.assert_any_call(
+            "System",
+            "v11 필수 본문 없음으로 제외: 1건",
+            "WARN",
+        )
 
 
 if __name__ == "__main__":

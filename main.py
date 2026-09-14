@@ -62,6 +62,19 @@ def save_json(data, name):
             pass
 
 
+def _partition_by_required_content(articles):
+    """Split v11 writer candidates without mutating the collected article data."""
+    accepted = []
+    excluded = 0
+    for article in articles:
+        content = article.get("content")
+        if isinstance(content, str) and content.strip():
+            accepted.append(article)
+        else:
+            excluded += 1
+    return accepted, excluded
+
+
 async def main(interruption_event=None):
     """메인 실행 프로세스 제어"""
     interruption_event = interruption_event or asyncio.Event()
@@ -116,6 +129,14 @@ async def main(interruption_event=None):
         for a in articles:
             a["site_name"] = name
             all_articles.append(a)
+
+    all_articles, excluded_articles = _partition_by_required_content(all_articles)
+    if excluded_articles:
+        log_status(
+            "System",
+            f"v11 필수 본문 없음으로 제외: {excluded_articles}건",
+            "WARN",
+        )
 
     if all_articles:
         from dataprepper.unifier import Unifier
