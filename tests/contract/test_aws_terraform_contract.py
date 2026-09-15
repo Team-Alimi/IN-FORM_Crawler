@@ -411,6 +411,22 @@ class AwsTerraformLayoutContractTests(unittest.TestCase):
             {"StringEquals": {"aws:RequestedRegion": "<AWS_REGION>"}},
         )
         self.assertEqual(
+            statements_by_sid["TerminateTaggedDevCrawlerWorkers"],
+            {
+                "Sid": "TerminateTaggedDevCrawlerWorkers",
+                "Effect": "Allow",
+                "Action": "ec2:TerminateInstances",
+                "Resource": ("arn:aws:ec2:<AWS_REGION>:<AWS_ACCOUNT_ID>:instance/*"),
+                "Condition": {
+                    "StringEquals": {
+                        "aws:RequestedRegion": "<AWS_REGION>",
+                        "aws:ResourceTag/Application": "inform-crawler",
+                        "aws:ResourceTag/Environment": "dev",
+                    }
+                },
+            },
+        )
+        self.assertEqual(
             statements_by_sid["ObserveAndStopDevCrawlerExecutions"],
             {
                 "Sid": "ObserveAndStopDevCrawlerExecutions",
@@ -941,6 +957,15 @@ class AwsDevHarnessContractTests(unittest.TestCase):
 
         self.assertIn("PRODUCTION_DB_ACCESS_ALLOWED", harness)
         self.assertIn("Assert-False", harness)
+        self.assertIn(
+            '-LogicalPrefix "arn:aws:states:$ExpectedRegion`:$ExpectedAccountId`:'
+            'stateMachine:inform-crawler-orchestration-dev"',
+            harness,
+        )
+        self.assertIn(
+            "-Expected '/inform/crawler/dev/PRODUCTION_DB_ACCESS_ALLOWED'",
+            harness,
+        )
         self.assertNotRegex(
             harness, r'(?i)(password|token|secret)\s*=\s*["\'][^"\']+["\']'
         )
@@ -962,7 +987,6 @@ class AwsDevHarnessContractTests(unittest.TestCase):
             "Timeout",
             "SpotInterruption",
             "CapacityFallback",
-            "All",
         ):
             with self.subTest(scenario=scenario):
                 self.assertEqual(
@@ -977,10 +1001,259 @@ class AwsDevHarnessContractTests(unittest.TestCase):
         self.assertIn("Assert-ExecutionFailed -Simulation 'TIMEOUT'", harness)
         self.assertNotIn("Assert-ExecutionSucceeded -Simulation 'TIMEOUT'", harness)
 
+    def test_harness_allowlist_and_switch_have_the_same_approved_branches(
+        self,
+    ) -> None:
+        harness = read("harness/run-dev.ps1")
+        expected_scenarios = {
+            "ValidateInfrastructure",
+            "Success",
+            "Overlap",
+            "LockExpiry",
+            "Heartbeat",
+            "TransientRetry",
+            "Timeout",
+            "SpotInterruption",
+            "CapacityFallback",
+        }
+
+        validate_set = re.search(
+            r"\[ValidateSet\((?P<values>.*?)\)\]\s*"
+            r"\[string\]\$Scenario",
+            harness,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(validate_set)
+        exposed_scenarios = set(
+            re.findall(r"'([A-Za-z]+)'", validate_set.group("values"))
+        )
+
+        switch = re.search(
+            r"switch \(\$Scenario\) \{(?P<body>.*?)\n\}\n\nWrite-Output",
+            harness,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(switch)
+        switch_scenarios = set(
+            re.findall(r"(?m)^\s*'([A-Za-z]+)'\s*\{", switch.group("body"))
+        )
+
+        self.assertEqual(expected_scenarios, exposed_scenarios)
+        self.assertEqual(expected_scenarios, switch_scenarios)
+        self.assertNotIn("All", exposed_scenarios)
+
+    def test_lease_scenarios_exercise_the_live_daily_lock_contract_safely(
+        self,
+    ) -> None:
+        harness = read("harness/run-dev.ps1")
+        worker = read("modules/spot/worker-command.sh.tftpl")
+
+        for fragment in (
+            "$LeaseLockKey = 'daily-crawler'",
+            "$AcquireLeaseCondition = "
+            "'attribute_not_exists(lock_key) OR lease_expires_at < :now'",
+            "$HarnessLeasePrecondition = "
+            "'attribute_not_exists(lock_key) OR "
+            "(owner_run_id=:empty AND lease_expires_at < :now)'",
+            "$OwnedLeaseCondition = 'owner_run_id=:owner AND generation=:generation'",
+            "generation=if_not_exists(generation,:zero)+:one",
+            "function Assert-LiveLeasePathContract",
+            "'SendWorkerCommand'",
+            "'ssm', 'get-document'",
+            "function Assert-HarnessLeasePrecondition",
+            "function Assert-HarnessLeaseAcquireRejected",
+            "ConditionalCheckFailedException",
+            "function Clear-HarnessLease",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, harness)
+
+        self.assertNotIn('"harness#', harness)
+        for unsafe_item_call in (
+            "'dynamodb', 'delete-item'",
+            "'dynamodb', 'get-item'",
+            "'dynamodb', 'put-item'",
+        ):
+            with self.subTest(unsafe_item_call=unsafe_item_call):
+                self.assertNotIn(unsafe_item_call, harness)
+        self.assertNotIn("function Test-LeasePrimitive", harness)
+        self.assertNotIn(
+            "$expires -ge [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()",
+            harness,
+        )
+
+        for variable in ("AcquireLeaseCondition", "OwnedLeaseCondition"):
+            condition = re.search(rf"\${variable}\s*=\s*'(?P<value>[^']+)'", harness)
+            self.assertIsNotNone(condition)
+            self.assertIn(condition.group("value"), worker)
+        self.assertIn("readonly LOCK_KEY='daily-crawler'", worker)
+
+        lock_expiry = harness[
+            harness.index("function Test-LockExpiryLease") : harness.index(
+                "function Test-HeartbeatLease"
+            )
+        ]
+        self.assertIn("Assert-HarnessLeasePrecondition", lock_expiry)
+        self.assertIn("Invoke-HarnessLeaseAcquire", lock_expiry)
+        self.assertIn("Assert-HarnessLeaseAcquireRejected", lock_expiry)
+        self.assertIn("Set-HarnessLeaseWindow", lock_expiry)
+        self.assertIn("Clear-HarnessLease", lock_expiry)
+        self.assertLess(
+            lock_expiry.index("Assert-LiveLeasePathContract"),
+            lock_expiry.index("Assert-HarnessLeasePrecondition"),
+        )
+
+        heartbeat = harness[
+            harness.index("function Test-HeartbeatLease") : harness.index(
+                "function Assert-CapacityFallbackDefinition"
+            )
+        ]
+        self.assertIn("Invoke-HarnessLeaseHeartbeat", heartbeat)
+        self.assertIn("$probeNow = $originalExpiry + 1", heartbeat)
+        self.assertIn("Assert-HarnessLeaseAcquireRejected", heartbeat)
+        self.assertIn("Clear-HarnessLease", heartbeat)
+        self.assertLess(
+            heartbeat.index("Assert-LiveLeasePathContract"),
+            heartbeat.index("Assert-HarnessLeasePrecondition"),
+        )
+
+        precondition = harness[
+            harness.index("function Assert-HarnessLeasePrecondition") : harness.index(
+                "function New-HarnessLeaseValuesJson"
+            )
+        ]
+        self.assertIn("-RequireReleased", precondition)
+
+        cleanup = harness[
+            harness.index("function Clear-HarnessLease") : harness.index(
+                "function Assert-HarnessLeaseAcquireRejected"
+            )
+        ]
+        self.assertIn("StartsWith('harness-lease-'", cleanup)
+        self.assertIn("'--condition-expression', $OwnedLeaseCondition", cleanup)
+
+        preflight = harness.index("\nAssert-DevInfrastructure\n")
+        scenario_switch = harness.index("\n    switch ($Scenario) {")
+        self.assertLess(preflight, scenario_switch)
+        self.assertIn("'LockExpiry' { Test-LockExpiryLease }", harness)
+        self.assertIn("'Heartbeat' { Test-HeartbeatLease }", harness)
+
     def test_retry_delay_assertion_accepts_valid_json_whitespace(self) -> None:
         harness = read("harness/run-dev.ps1")
         self.assertIn(r"""'"Seconds"\s*:\s*600'""", harness)
         self.assertIn(r"""'"Seconds"\s*:\s*1800'""", harness)
+
+    def test_dev_db_guard_uses_exact_dev_path_without_generic_prod_token_check(
+        self,
+    ) -> None:
+        harness = read("harness/run-dev.ps1")
+        preflight = harness[
+            harness.index("function Assert-DevInfrastructure") : harness.index(
+                "function Get-ExecutionInput"
+            )
+        ]
+
+        self.assertNotIn("Assert-DevName -Name 'DevDbGuardParameter'", preflight)
+        self.assertIn(
+            "Assert-Equal -Name 'DevDbGuardParameter' "
+            "-Actual $DevDbGuardParameter "
+            "-Expected '/inform/crawler/dev/PRODUCTION_DB_ACCESS_ALLOWED'",
+            preflight,
+        )
+
+    def test_lease_failures_emit_allowlisted_stage_markers(self) -> None:
+        harness = read("harness/run-dev.ps1")
+
+        for stage in (
+            "DevInfrastructure",
+            "DevIdentity",
+            "DevNaming",
+            "DevDbGuard",
+            "DevStateBucket",
+            "DevLockTable",
+            "DevScheduler",
+            "DevStateMachine",
+            "LiveLeaseContract",
+            "LeasePrecondition",
+            "ActiveLeaseRejection",
+            "ExpiredLeaseTakeover",
+            "HeartbeatExtension",
+        ):
+            with self.subTest(stage=stage):
+                self.assertIn(f"HARNESS_STAGE name={stage}", harness)
+
+    def test_execution_status_polling_retries_only_within_fixed_bound(self) -> None:
+        harness = read("harness/run-dev.ps1")
+        retry_helper = re.search(
+            r"function Invoke-ReadOnlyAwsJsonWithRetry \{(?P<body>.*?)\n\}",
+            harness,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(retry_helper)
+        retry_body = retry_helper.group("body")
+        self.assertIn("[ValidateRange(1, 5)][int]$MaxAttempts = 3", retry_body)
+        self.assertIn("[ValidateRange(0, 30)][int]$RetryDelaySeconds = 5", retry_body)
+        self.assertIn("$attempt -lt $MaxAttempts", retry_body)
+        self.assertIn("Start-Sleep -Seconds $RetryDelaySeconds", retry_body)
+
+        wait_helper = re.search(
+            r"function Wait-DevExecution \{(?P<body>.*?)\n\}",
+            harness,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(wait_helper)
+        self.assertIn(
+            "Invoke-ReadOnlyAwsJsonWithRetry -Arguments "
+            "@('stepfunctions', 'describe-execution'",
+            wait_helper.group("body"),
+        )
+        self.assertEqual(
+            1,
+            harness.count("Invoke-ReadOnlyAwsJsonWithRetry -Arguments"),
+        )
+
+    def test_harness_stops_execution_before_role_credentials_expire(self) -> None:
+        harness = read("harness/run-dev.ps1")
+        coordinator = (REPO_ROOT / ".codex-dev-plan-coordinator.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("[Parameter(Mandatory)][long]$CredentialExpiresAtEpoch", harness)
+        self.assertIn("$CredentialCleanupBufferSeconds = 600", harness)
+        self.assertIn("HARNESS_STAGE name=CredentialSafetyStop", harness)
+        self.assertIn("'stepfunctions', 'stop-execution'", harness)
+        self.assertIn("ROLE_CREDENTIAL_EXPIRATION_KEY", coordinator)
+        self.assertIn('"-CredentialExpiresAtEpoch"', coordinator)
+
+    def test_harness_cleans_up_started_executions_when_polling_fails(self) -> None:
+        harness = read("harness/run-dev.ps1")
+        wait_helper = re.search(
+            r"function Wait-DevExecution \{(?P<body>.*?)\n\}",
+            harness,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(wait_helper)
+        wait_body = wait_helper.group("body")
+
+        deadline_check = wait_body.index("$remainingSeconds -le 0")
+        polling_call = wait_body.index("Invoke-ReadOnlyAwsJsonWithRetry")
+        self.assertLess(deadline_check, polling_call)
+        self.assertIn("catch", wait_body)
+        self.assertIn("Stop-ActiveDevExecutions", wait_body)
+        self.assertIn("$script:ActiveExecutionArns.Add", harness)
+        self.assertIn("$script:ActiveExecutionArns.Remove", harness)
+        self.assertRegex(
+            harness,
+            r"(?s)try \{\s*switch \(\$Scenario\).*?finally \{\s*Stop-ActiveDevExecutions",
+        )
+
+    def test_coordinator_has_parent_fallback_for_harness_executions(self) -> None:
+        coordinator = (REPO_ROOT / ".codex-dev-plan-coordinator.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('"-HarnessRunId"', coordinator)
+        self.assertIn("stop_matching_harness_executions", coordinator)
 
 
 if __name__ == "__main__":

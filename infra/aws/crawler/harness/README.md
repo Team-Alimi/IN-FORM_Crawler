@@ -27,8 +27,16 @@ Example shape (replace placeholders locally; do not commit them):
   -DevSchedulerName 'inform-crawler-scheduler-dev' `
   -DevStateMachineArn '<dev-state-machine-arn>' `
   -DevDbGuardParameter '/inform/crawler/dev/PRODUCTION_DB_ACCESS_ALLOWED' `
+  -CredentialExpiresAtEpoch '<STS-expiration-unix-seconds>' `
+  -HarnessRunId '<unique-lowercase-hex-id>' `
   -Scenario ValidateInfrastructure
 ```
+
+Execution scenarios stop their dev Step Functions execution ten minutes before the supplied
+temporary-role expiration so worker cleanup can run while credentials remain valid. Supply the
+actual STS expiration; do not estimate or persist it with credential values.
+The coordinator supplies a unique run ID so its bounded fallback cleanup can stop only executions
+started by that harness invocation if the child process or status polling fails.
 
 Do not put secret values in command history, Terraform outputs, harness output,
 or this directory.
