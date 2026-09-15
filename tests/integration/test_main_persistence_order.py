@@ -161,7 +161,10 @@ class MainPersistenceOrderTests(unittest.TestCase):
 
         unifier, _ = self.run_main(
             mock.AsyncMock(
-                return_value=("site", [raw_valid, invalid_whitespace, invalid_non_string])
+                return_value=(
+                    "site",
+                    [raw_valid, invalid_whitespace, invalid_non_string],
+                )
             ),
             unified=([valid_insert], [valid_update]),
         )
